@@ -2405,9 +2405,11 @@ function changeMonth(){
   // 5. Renderiza inputs (agora com valores padrão de BASE)
   renderEditTable();
   
-  // 6. Carrega dados salvos do mês selecionado (sobrescreve inputs se houver)
-  loadData();
-  loadClientsData();
+  // 6. Limpa localStorage para forçar reload do Supabase
+  try {
+    localStorage.removeItem('dados_' + newMonth);
+    localStorage.removeItem('riosulense_clients_' + newMonth);
+  } catch(e) {}
 
   // 6.5 SEMPRE tenta carregar dados do Supabase para manter dados atualizados
   const mesSupabase = newMonth + '-01';
