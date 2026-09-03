@@ -2421,12 +2421,16 @@ function changeMonth(){
         console.log('✅ BASE atualizado com dados do Supabase para:', mesSupabase);
         renderEditTable();
         recalc();
+        // Atualizar informações de resultado do mês DEPOIS de carregar dados
+        updateInativMesNome();
       }
     } else {
       console.log('ℹ️ Nenhum dado do Supabase para:', mesSupabase, '- Usando dados locais');
+      updateInativMesNome();
     }
   }).catch(error => {
     console.warn('⚠️ Não foi possível carregar dados do Supabase, usando dados locais:', error);
+    updateInativMesNome();
   });
 
   // 6.6 Tenta carregar clientes do Supabase também
