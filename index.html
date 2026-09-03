@@ -543,6 +543,17 @@
 
 <!-- SUPABASE INITIALIZATION -->
 <script>
+  // Limpar localStorage ao carregar página (force dados novos do Supabase)
+  try {
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+      if (key.startsWith('dados_') || key.startsWith('riosulense_')) {
+        localStorage.removeItem(key);
+      }
+    });
+    console.log('🔄 Cache local limpo - forçando reload do Supabase');
+  } catch(e) {}
+
   // Variáveis globais do Supabase
   window.SUPABASE_URL = 'https://wpjroobpgboaeuarhiue.supabase.co';
   window.SUPABASE_KEY = 'sb_publishable_DPTWMKwBRz2SMzBPbVYwlg_eitR1I1R';
