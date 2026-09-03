@@ -541,23 +541,33 @@
 <!-- SUPABASE CLIENT LIBRARY -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- SUPABASE INITIALIZATION & DATA LOADING -->
+<!-- SUPABASE INITIALIZATION -->
 <script>
-  // Configuração do Supabase
-  const SUPABASE_URL = 'https://wpjroobpgboaeuarhiue.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_DPTWMKwBRz2SMzBPbVYwlg_eitR1I1R';
+  // Variáveis globais do Supabase
+  window.SUPABASE_URL = 'https://wpjroobpgboaeuarhiue.supabase.co';
+  window.SUPABASE_KEY = 'sb_publishable_DPTWMKwBRz2SMzBPbVYwlg_eitR1I1R';
+  window.supabaseClient = null;
+  window.dadosSupabaseCarregados = false;
 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  // Inicializar Supabase quando a biblioteca carregar
+  function initSupabase() {
+    if (window.supabase && !window.supabaseClient) {
+      window.supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
+      console.log('✅ Supabase inicializado');
+    }
+  }
 
-  // Flag para indicar se os dados foram carregados do Supabase
-  let dadosSupabaseCarregados = false;
-
-  // Função para buscar dados mensais do Supabase
+  // Função global para buscar dados mensais do Supabase
   async function carregarDadosSupabase(mes) {
+    if (!window.supabaseClient) {
+      console.warn('⚠️ Supabase não inicializado');
+      return null;
+    }
+
     try {
       console.log('📊 Carregando dados do Supabase para:', mes);
 
-      const { data, error } = await supabase
+      const { data, error } = await window.supabaseClient
         .from('view_resumo_mensal')
         .select('*')
         .eq('mes', mes);
@@ -580,11 +590,10 @@
     }
   }
 
-  // Função para mapear dados do Supabase para o formato BASE
+  // Função global para mapear dados do Supabase para o formato BASE
   function mapearDadosSupabase(dadosSupabase) {
     if (!dadosSupabase || dadosSupabase.length === 0) return null;
 
-    // Mapear campos: meta, realizado, cenario_comercial, carteira -> meta, real, prev, car
     return dadosSupabase.map(rep => ({
       name: rep.nome,
       meta: rep.meta || 0,
@@ -594,41 +603,11 @@
     }));
   }
 
-  // Executar ao carregar a página
-  window.addEventListener('load', async function() {
-    // Esperar um pouco para garantir que BASE e outras variáveis já foram inicializadas
-    setTimeout(async () => {
-      // Determinar o mês selecionado (padrão: março 2026)
-      const mesSelect = document.getElementById('month-selector');
-      let mesAtual = mesSelect ? mesSelect.value + '-01' : '2026-03-01';
-
-      // Tentar carregar dados do Supabase
-      const dadosSupabase = await carregarDadosSupabase(mesAtual);
-
-      if (dadosSupabase && dadosSupabase.length > 0) {
-        // Mapear dados do Supabase para o formato BASE
-        const baseAtualizado = mapearDadosSupabase(dadosSupabase);
-
-        if (baseAtualizado && baseAtualizado.length > 0) {
-          // Substituir BASE pelos dados do Supabase
-          BASE.length = 0; // Limpar array
-          BASE.push(...baseAtualizado); // Adicionar novos dados
-
-          dadosSupabaseCarregados = true;
-          console.log('✅ BASE atualizado com dados do Supabase:', BASE);
-
-          // Se a função loadData ou renderização existe, chamar ela
-          if (typeof loadData === 'function') {
-            loadData();
-          }
-          if (typeof renderDashboard === 'function') {
-            renderDashboard();
-          }
-        }
-      } else {
-        console.warn('⚠️ Usando dados padrão (localStorage/BASE)');
-      }
-    }, 500);
+  // Inicializar quando a página carregar
+  window.addEventListener('load', function() {
+    setTimeout(() => {
+      initSupabase();
+    }, 100);
   });
 </script>
 
@@ -2396,24 +2375,30 @@ function changeMonth(){
   loadData();
   loadClientsData();
 
-  // 6.5 Tenta carregar dados do Supabase para o novo mês
-  const mesSupabase = newMonth + '-01';
-  carregarDadosSupabase(mesSupabase).then(dadosSupabase => {
-    if (dadosSupabase && dadosSupabase.length > 0) {
-      const baseAtualizado = mapearDadosSupabase(dadosSupabase);
-      if (baseAtualizado && baseAtualizado.length > 0) {
-        // Substituir BASE pelos dados do Supabase
-        BASE.length = 0;
-        BASE.push(...baseAtualizado);
-        console.log('✅ BASE atualizado com dados do Supabase para:', mesSupabase);
-        renderEditTable();
-        recalc();
+  // 6.5 Tenta carregar dados do Supabase para o novo mês (apenas se não houver dados locais)
+  const dadosLocaisSalvos = localStorage.getItem(`dados_${newMonth}`);
+
+  if (!dadosLocaisSalvos) {
+    // Só carrega Supabase se não houver dados locais salvos
+    const mesSupabase = newMonth + '-01';
+    carregarDadosSupabase(mesSupabase).then(dadosSupabase => {
+      if (dadosSupabase && dadosSupabase.length > 0) {
+        const baseAtualizado = mapearDadosSupabase(dadosSupabase);
+        if (baseAtualizado && baseAtualizado.length > 0) {
+          // Substituir BASE pelos dados do Supabase
+          BASE.length = 0;
+          BASE.push(...baseAtualizado);
+          console.log('✅ BASE carregado do Supabase para:', mesSupabase);
+          renderEditTable();
+          recalc();
+        }
       }
-    }
-  }).catch(error => {
-    console.warn('⚠️ Não foi possível carregar dados do Supabase:', error);
-    // Continuar com dados do localStorage
-  });
+    }).catch(error => {
+      console.warn('⚠️ Não foi possível carregar dados do Supabase:', error);
+    });
+  } else {
+    console.log('✅ Usando dados salvos localmente para:', newMonth);
+  }
 
   // 7. Recalcula tudo
   recalc();
