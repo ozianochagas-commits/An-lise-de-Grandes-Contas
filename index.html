@@ -2512,10 +2512,11 @@ function resultadoDoMes(monthKey){
   }catch(e){ return null; }
 }
 
-// Sincroniza o bloco "Resultado do Mês" da aba Clientes Inativos com o MÊS DA PLANILHA
-// (o mesmo de "Grupos Sem Venda em ..."), para as datas nunca ficarem divergentes.
+// Sincroniza o bloco "Resultado do Mês" da aba Clientes Inativos com o MÊS SELECIONADO
+// Usa currentMonth (mês selecionado no dropdown) em vez do mês da planilha
 function updateInativResultado(){
-  const key = inativRefMonthKey();
+  // Usar o mês selecionado (currentMonth) em vez de inativRefMonthKey()
+  const key = currentMonth || inativRefMonthKey();
   const nome = key ? monthFullName(key) : '';
   if(nome) sv('inativ-mes-nome', nome);
   // Link compartilhado → usa o "Resultado" que veio embutido no link.
