@@ -2519,6 +2519,19 @@ function updateInativResultado(){
   const key = currentMonth || inativRefMonthKey();
   const nome = key ? monthFullName(key) : '';
   if(nome) sv('inativ-mes-nome', nome);
+
+  // Atualizar o KPI "Grupos Sem Venda em ..." com o mês selecionado
+  if(key) {
+    const meses = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const parts = key.split('-');
+    if(parts.length === 2) {
+      const mesNum = parseInt(parts[1]);
+      const ano = parts[0].slice(-2); // Pega últimos 2 dígitos do ano
+      const mesAbrev = meses[mesNum] || '';
+      sv('inativ-kpi-mes', 'em ' + mesAbrev + './' + ano);
+    }
+  }
+
   // Link compartilhado → usa o "Resultado" que veio embutido no link.
   if(window.__resMes){
     sv('inativ-mes-real', window.__resMes.real || '—');
