@@ -603,6 +603,40 @@
     }));
   }
 
+  // Função global para buscar dados de clientes (incluindo inativos) do Supabase
+  async function carregarClientesSupabase(mes, representanteId = null) {
+    if (!window.supabaseClient) {
+      console.warn('⚠️ Supabase não inicializado');
+      return null;
+    }
+
+    try {
+      console.log('📊 Carregando clientes do Supabase para:', mes);
+
+      let query = window.supabaseClient
+        .from('clientes')
+        .select('*')
+        .eq('mes', mes);
+
+      if (representanteId) {
+        query = query.eq('representante_id', representanteId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('❌ Erro ao buscar clientes:', error);
+        return null;
+      }
+
+      console.log('✅ Clientes carregados com sucesso:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Erro ao carregar clientes do Supabase:', error);
+      return null;
+    }
+  }
+
   // Inicializar quando a página carregar
   window.addEventListener('load', function() {
     setTimeout(() => {
@@ -2377,6 +2411,7 @@ function changeMonth(){
 
   // 6.5 Tenta carregar dados do Supabase para o novo mês (apenas se não houver dados locais)
   const dadosLocaisSalvos = localStorage.getItem(`dados_${newMonth}`);
+  const clientesLocaisSalvos = localStorage.getItem(`riosulense_clients_${newMonth}`);
 
   if (!dadosLocaisSalvos) {
     // Só carrega Supabase se não houver dados locais salvos
@@ -2398,6 +2433,21 @@ function changeMonth(){
     });
   } else {
     console.log('✅ Usando dados salvos localmente para:', newMonth);
+  }
+
+  // 6.6 Tenta carregar clientes do Supabase (apenas se não houver clientes locais salvos)
+  if (!clientesLocaisSalvos) {
+    const mesSupabase = newMonth + '-01';
+    carregarClientesSupabase(mesSupabase).then(clientes => {
+      if (clientes && clientes.length > 0) {
+        console.log('✅ Clientes carregados do Supabase para:', mesSupabase);
+        // Os clientes serão processados e armazenados conforme necessário
+      }
+    }).catch(error => {
+      console.warn('⚠️ Não foi possível carregar clientes do Supabase:', error);
+    });
+  } else {
+    console.log('✅ Usando clientes salvos localmente para:', newMonth);
   }
 
   // 7. Recalcula tudo
