@@ -2383,6 +2383,11 @@ function changeMonth(){
   const oldMonth = currentMonth;
   currentMonth = newMonth;
 
+  // 2.5. ATUALIZAR URL para incluir o mês (para compartilhamento correto)
+  const url = new URL(window.location);
+  url.searchParams.set('month', newMonth);
+  window.history.pushState({month: newMonth}, '', url);
+
   // 3. LIMPAR localStorage do mês ANTIGO para evitar cache sujo
   localStorage.removeItem(`dados_${oldMonth}`);
   localStorage.removeItem(`riosulense_clients_${oldMonth}`);
@@ -3778,8 +3783,18 @@ async function initDashboard() {
   // 0. Verifica se a página foi aberta por um link compartilhado (#b= ou #d=)
   const shared = await carregarLinkCompartilhado();
 
-  // 1. Define o mês vigente (só quando NÃO veio de link — o link traz seu próprio mês)
-  if(!shared) currentMonth = getVigenteMonth();
+  // 0.5. Verifica se tem parâmetro de mês na URL (?month=2026-09)
+  const urlParams = new URLSearchParams(window.location.search);
+  const monthParam = urlParams.get('month');
+
+  // 1. Define o mês vigente (prioridade: URL > link compartilhado > vigente)
+  if(!shared) {
+    if(monthParam && monthParam.match(/^\d{4}-\d{2}$/)) {
+      currentMonth = monthParam;
+    } else {
+      currentMonth = getVigenteMonth();
+    }
+  }
 
   // 2. Atualiza seletor dropdown para o mês atual
   const monthSelector = document.getElementById('month-selector');
