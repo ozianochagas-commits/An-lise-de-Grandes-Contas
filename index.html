@@ -2906,11 +2906,11 @@ function renderInativImported(){
   if(!INATIV_DATA || !INATIV_DATA.grupos || !INATIV_DATA.grupos.length) return;
   const m = INATIV_DATA.months;
 
-  // Contar quantos grupos não compraram em cada mês
+  // Contar quantos grupos não compraram em cada mês (vals[k] === 0 = sem venda)
   const contarNaoComprou = (mesIdx) => {
     let count = 0;
     INATIV_DATA.grupos.forEach(grupo => {
-      if(grupo.vals && grupo.vals[mesIdx] === 'NÃO') {
+      if(grupo.vals && grupo.vals[mesIdx] === 0) {
         count++;
       }
     });
