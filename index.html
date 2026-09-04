@@ -2906,11 +2906,13 @@ function renderInativImported(){
   if(!INATIV_DATA || !INATIV_DATA.grupos || !INATIV_DATA.grupos.length) return;
   const m = INATIV_DATA.months;
 
-  // Contar quantos grupos não compraram em cada mês (vals[k] === 0 = sem venda)
+  // Contar quantos grupos não compraram em cada mês (usa grupos que estão na TELA)
   const contarNaoComprou = (mesIdx) => {
     let count = 0;
-    INATIV_DATA.grupos.forEach(grupo => {
-      if(grupo.vals && grupo.vals[mesIdx] === 0) {
+    const gruposFiltrados = getFilteredInativGrupos(); // Grupos que estão sendo exibidos
+    gruposFiltrados.forEach(grupo => {
+      // Conta se o grupo OU alguma filial não comprou naquele mês
+      if(gGrupoTemSemVenda(grupo, mesIdx)) {
         count++;
       }
     });
