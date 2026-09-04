@@ -852,7 +852,7 @@
       <p>Edite diretamente: <strong>META</strong>, <strong>REALIZADO</strong> e <strong>CENÁRIO COMERCIAL</strong>.<br>
          Todos os cálculos atualizam automaticamente em tempo real.</p>
     </div>
-    <div class="htotal"><span>Projeção Total</span><strong id="hero-proj">—</strong><span id="hero-pct">— da meta</span><br><span id="hero-mes" style="font-size:12px;color:#999;margin-top:6px;display:block;">Mês</span></div>
+    <div class="htotal"><span>Projeção Total</span><strong id="hero-proj">—</strong><span id="hero-pct">— da meta</span></div>
   </div>
   <div class="pgrid">
     <div class="pcard a"><div class="pcl">Total Meta</div><div class="pcv" id="pv-meta">—</div><div class="pcs">Objetivo do mês</div></div>
@@ -1751,10 +1751,7 @@ function recalc(){
   sv('pv-proj',R(aProj)); sv('pv-pct',P(aPrj)+' da meta');
   sv('pv-atp',P(aAtp)); sv('pv-prj',P(aPrj));
   sv('hero-proj',R(aProj)); sv('hero-pct',P(aPrj)+' da meta');
-  // Atualiza o nome do mês na Projeção Total
-  const mesMostrado = monthFullName(currentMonth) || 'Mês';
-  sv('hero-mes', mesMostrado);
-
+  
   // Renderiza dashboard com os valores atualizados (para atualizar tabela, KPIs e gráfico)
   renderDashboard(isAll ? vals : disp);
   
@@ -2377,79 +2374,88 @@ function changeMonth(){
     saveData();
     saveClientsData();
   }
-  
+
   // 2. Pega o novo mês
   const selector = $('month-selector');
   if(!selector) return;
-  
+
   const newMonth = selector.value;
+  const oldMonth = currentMonth;
   currentMonth = newMonth;
-  
-  // 3. Restaura BASE para valores padrão
+
+  // 3. LIMPAR localStorage do mês ANTIGO para evitar cache sujo
+  localStorage.removeItem(`dados_${oldMonth}`);
+  localStorage.removeItem(`riosulense_clients_${oldMonth}`);
+  localStorage.removeItem(`dados_resultado_${oldMonth}`);
+
+  // 4. Restaura BASE para valores padrão
   for(let i = 0; i < BASE.length; i++) {
     BASE[i].meta = BASE_DEFAULT[i].meta;
     BASE[i].real = BASE_DEFAULT[i].real;
     BASE[i].prev = BASE_DEFAULT[i].prev;
     BASE[i].car = BASE_DEFAULT[i].car;
   }
-  
-  // 4. Atualiza display
+
+  // 5. Atualiza display
   const monthNames = {
     '2026-01': 'Janeiro 2026', '2026-02': 'Fevereiro 2026', '2026-03': 'Março 2026',
     '2026-04': 'Abril 2026', '2026-05': 'Maio 2026', '2026-06': 'Junho 2026',
     '2026-07': 'Julho 2026', '2026-08': 'Agosto 2026', '2026-09': 'Setembro 2026',
     '2026-10': 'Outubro 2026', '2026-11': 'Novembro 2026', '2026-12': 'Dezembro 2026'
   };
-  
+
   const hdrMonth = $('hdr-month');
   if(hdrMonth) hdrMonth.textContent = monthNames[newMonth];
   updateInativMesNome();
-  
-  // 5. Renderiza inputs (agora com valores padrão de BASE)
-  renderEditTable();
-  
-  // 6. Carrega dados salvos do mês selecionado (sobrescreve inputs se houver)
-  loadData();
-  loadClientsData();
 
-  // 6.5 SEMPRE tenta carregar dados do Supabase para manter dados atualizados
+  // 6. Renderiza inputs (agora com valores padrão de BASE)
+  renderEditTable();
+
+  // 7. PRIMEIRO: Carrega dados do Supabase (dados FRESCOS)
   const mesSupabase = newMonth + '-01';
-  carregarDadosSupabase(mesSupabase).then(dadosSupabase => {
+
+  // Usar Promise.all para carregar dados E clientes em paralelo
+  Promise.all([
+    carregarDadosSupabase(mesSupabase),
+    carregarClientesSupabase(mesSupabase)
+  ]).then(([dadosSupabase, clientes]) => {
+    let deuCerto = false;
+
+    // Se conseguiu dados do Supabase, usar eles
     if (dadosSupabase && dadosSupabase.length > 0) {
       const baseAtualizado = mapearDadosSupabase(dadosSupabase);
       if (baseAtualizado && baseAtualizado.length > 0) {
-        // Substituir BASE pelos dados do Supabase
         BASE.length = 0;
         BASE.push(...baseAtualizado);
-        console.log('✅ BASE atualizado com dados do Supabase para:', mesSupabase);
-        renderEditTable();
-        recalc();
-        // Atualizar informações de resultado do mês DEPOIS de carregar dados
-        updateInativMesNome();
+        deuCerto = true;
+        console.log('✅ BASE atualizado com dados FRESCOS do Supabase para:', mesSupabase);
       }
-    } else {
-      console.log('ℹ️ Nenhum dado do Supabase para:', mesSupabase, '- Usando dados locais');
-      updateInativMesNome();
     }
-  }).catch(error => {
-    console.warn('⚠️ Não foi possível carregar dados do Supabase, usando dados locais:', error);
+
+    // Se não conseguiu do Supabase, tenta localStorage como fallback
+    if (!deuCerto) {
+      console.log('ℹ️ Tentando fallback do localStorage para:', newMonth);
+      loadData();
+      loadClientsData();
+    }
+
+    // Renderiza e recalcula
+    renderEditTable();
+    recalc();
     updateInativMesNome();
-  });
 
-  // 6.6 Tenta carregar clientes do Supabase também
-  carregarClientesSupabase(mesSupabase).then(clientes => {
-    if (clientes && clientes.length > 0) {
-      console.log('✅ Clientes carregados do Supabase para:', mesSupabase);
-    }
+    // Notificação
+    showNotification(`📅 ${monthNames[newMonth]}`);
   }).catch(error => {
-    console.warn('⚠️ Não foi possível carregar clientes do Supabase:', error);
+    console.warn('⚠️ Erro ao carregar dados, usando localStorage:', error);
+    // Fallback: carregar do localStorage
+    loadData();
+    loadClientsData();
+    renderEditTable();
+    recalc();
+    updateInativMesNome();
+    showNotification(`📅 ${monthNames[newMonth]}`);
   });
-
-  // 7. Recalcula tudo
-  recalc();
-  
-  // 8. Notificação
-  showNotification(`📅 ${monthNames[newMonth]}`);
 }
 
 function setAutoDate(){
