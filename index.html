@@ -3,9 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <title>Dashboard de Vendas — Riosulense</title>
 <style>
   :root {
@@ -540,138 +537,6 @@
     padding:12px 24px;font-size:12px;font-weight:700;cursor:pointer;width:100%;transition:background .2s;}
   .btn-modal-save:hover{background:#155724;}
 </style>
-
-<!-- SUPABASE CLIENT LIBRARY -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- SUPABASE INITIALIZATION -->
-<script>
-  // Timestamp de carregamento da página - usado para cache-busting
-  window.PAGE_LOAD_TIME = Date.now();
-
-  // Variáveis globais do Supabase
-  window.SUPABASE_URL = 'https://wpjroobpgboaeuarhiue.supabase.co';
-  window.SUPABASE_KEY = 'sb_publishable_DPTWMKwBRz2SMzBPbVYwlg_eitR1I1R';
-  window.supabaseClient = null;
-  window.dadosSupabaseCarregados = false;
-
-  // Inicializar Supabase quando a biblioteca carregar
-  function initSupabase() {
-    if (window.supabase && !window.supabaseClient) {
-      window.supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
-      console.log('✅ Supabase inicializado');
-    }
-  }
-
-  // Função global para buscar dados mensais do Supabase
-  async function carregarDadosSupabase(mes) {
-    if (!window.supabaseClient) {
-      console.warn('⚠️ Supabase não inicializado');
-      return null;
-    }
-
-    try {
-      console.log('📊 Carregando dados do Supabase para:', mes);
-
-      // Cache-busting: adicionar timestamp para forçar busca sempre do Supabase
-      const cacheKey = `resumo_${mes}_${Date.now()}`;
-
-      const { data, error } = await window.supabaseClient
-        .from('view_resumo_mensal')
-        .select('*')
-        .eq('mes', mes);
-
-      if (error) {
-        console.error('❌ Erro ao buscar dados:', error);
-        return null;
-      }
-
-      if (!data || data.length === 0) {
-        console.warn('⚠️ Nenhum dado encontrado para:', mes);
-        return null;
-      }
-
-      console.log('✅ Dados carregados com sucesso:', data);
-      return data;
-    } catch (error) {
-      console.error('❌ Erro ao carregar dados do Supabase:', error);
-      return null;
-    }
-  }
-
-  // Função global para mapear dados do Supabase para o formato BASE
-  function mapearDadosSupabase(dadosSupabase) {
-    if (!dadosSupabase || dadosSupabase.length === 0) return null;
-
-    return dadosSupabase.map(rep => ({
-      name: rep.nome,
-      meta: rep.meta || 0,
-      real: rep.realizado || 0,
-      prev: rep.cenario_comercial || 0,
-      car: rep.carteira || 0
-    }));
-  }
-
-  // Função global para buscar dados de clientes (incluindo inativos) do Supabase
-  async function carregarClientesSupabase(mes, representanteId = null) {
-    if (!window.supabaseClient) {
-      console.warn('⚠️ Supabase não inicializado');
-      return null;
-    }
-
-    try {
-      console.log('📊 Carregando clientes do Supabase para:', mes);
-
-      // Cache-busting: adicionar timestamp para forçar busca sempre do Supabase
-      const cacheKey = `clientes_${mes}_${Date.now()}`;
-
-      let query = window.supabaseClient
-        .from('clientes')
-        .select('*')
-        .eq('mes', mes);
-
-      if (representanteId) {
-        query = query.eq('representante_id', representanteId);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('❌ Erro ao buscar clientes:', error);
-        return null;
-      }
-
-      console.log('✅ Clientes carregados com sucesso:', data);
-      return data;
-    } catch (error) {
-      console.error('❌ Erro ao carregar clientes do Supabase:', error);
-      return null;
-    }
-  }
-
-  // Inicializar quando a página carregar
-  window.addEventListener('load', function() {
-    // 🔥 AGRESSIVO: Limpar localStorage completamente para forçar dados do Supabase
-    try {
-      const keysToRemove = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('dados_') || key.startsWith('riosulense_') || key.startsWith('clientes_'))) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach(key => localStorage.removeItem(key));
-      console.log('🔥 Cache agressivo limpo:', keysToRemove.length, 'chaves removidas');
-    } catch(e) {
-      console.warn('⚠️ Erro ao limpar cache:', e);
-    }
-
-    setTimeout(() => {
-      initSupabase();
-    }, 100);
-  });
-</script>
-
 </head>
 <body>
 
@@ -2401,28 +2266,13 @@ function changeMonth(){
     saveData();
     saveClientsData();
   }
-
+  
   // 2. Pega o novo mês
   const selector = $('month-selector');
   if(!selector) return;
-
+  
   const newMonth = selector.value;
   currentMonth = newMonth;
-
-  // 🔥 ANTES DE CARREGAR DADOS: Limpar localStorage para forçar Supabase
-  try {
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.includes(newMonth) || key.startsWith('riosulense_') || key.startsWith('dados_'))) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach(key => localStorage.removeItem(key));
-    console.log('🧹 Cache do mês', newMonth, 'limpo:', keysToRemove.length, 'chaves');
-  } catch(e) {
-    console.warn('⚠️ Erro ao limpar cache ao mudar mês:', e);
-  }
   
   // 3. Restaura BASE para valores padrão
   for(let i = 0; i < BASE.length; i++) {
@@ -2450,40 +2300,7 @@ function changeMonth(){
   // 6. Carrega dados salvos do mês selecionado (sobrescreve inputs se houver)
   loadData();
   loadClientsData();
-
-  // 6.5 SEMPRE tenta carregar dados do Supabase para manter dados atualizados
-  const mesSupabase = newMonth + '-01';
-  carregarDadosSupabase(mesSupabase).then(dadosSupabase => {
-    if (dadosSupabase && dadosSupabase.length > 0) {
-      const baseAtualizado = mapearDadosSupabase(dadosSupabase);
-      if (baseAtualizado && baseAtualizado.length > 0) {
-        // Substituir BASE pelos dados do Supabase
-        BASE.length = 0;
-        BASE.push(...baseAtualizado);
-        console.log('✅ BASE atualizado com dados do Supabase para:', mesSupabase);
-        renderEditTable();
-        recalc();
-        // Atualizar informações de resultado do mês DEPOIS de carregar dados
-        updateInativMesNome();
-      }
-    } else {
-      console.log('ℹ️ Nenhum dado do Supabase para:', mesSupabase, '- Usando dados locais');
-      updateInativMesNome();
-    }
-  }).catch(error => {
-    console.warn('⚠️ Não foi possível carregar dados do Supabase, usando dados locais:', error);
-    updateInativMesNome();
-  });
-
-  // 6.6 Tenta carregar clientes do Supabase também
-  carregarClientesSupabase(mesSupabase).then(clientes => {
-    if (clientes && clientes.length > 0) {
-      console.log('✅ Clientes carregados do Supabase para:', mesSupabase);
-    }
-  }).catch(error => {
-    console.warn('⚠️ Não foi possível carregar clientes do Supabase:', error);
-  });
-
+  
   // 7. Recalcula tudo
   recalc();
   
@@ -2554,26 +2371,12 @@ function resultadoDoMes(monthKey){
   }catch(e){ return null; }
 }
 
-// Sincroniza o bloco "Resultado do Mês" da aba Clientes Inativos com o MÊS SELECIONADO
-// Usa currentMonth (mês selecionado no dropdown) em vez do mês da planilha
+// Sincroniza o bloco "Resultado do Mês" da aba Clientes Inativos com o MÊS DA PLANILHA
+// (o mesmo de "Grupos Sem Venda em ..."), para as datas nunca ficarem divergentes.
 function updateInativResultado(){
-  // Usar o mês selecionado (currentMonth) em vez de inativRefMonthKey()
-  const key = currentMonth || inativRefMonthKey();
+  const key = inativRefMonthKey();
   const nome = key ? monthFullName(key) : '';
   if(nome) sv('inativ-mes-nome', nome);
-
-  // Atualizar o KPI "Grupos Sem Venda em ..." com o mês selecionado
-  if(key) {
-    const meses = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const parts = key.split('-');
-    if(parts.length === 2) {
-      const mesNum = parseInt(parts[1]);
-      const ano = parts[0].slice(-2); // Pega últimos 2 dígitos do ano
-      const mesAbrev = meses[mesNum] || '';
-      sv('inativ-kpi-mes', 'em ' + mesAbrev + './' + ano);
-    }
-  }
-
   // Link compartilhado → usa o "Resultado" que veio embutido no link.
   if(window.__resMes){
     sv('inativ-mes-real', window.__resMes.real || '—');
@@ -2657,7 +2460,6 @@ function applyGroupOverrides(){
   Object.keys(INATIV_BY_REP).forEach(rep => {
     const keep = [];
     (INATIV_BY_REP[rep].grupos || []).forEach(g => {
-      if(grupoExcluido(g.nome)) return;   // retirado da análise (não entra em keep nem em moves)
       const target = repOverrideForGroup(g.nome);
       if(target){
         (g.filiais || []).forEach(f => { (moves[target] = moves[target] || []).push(Object.assign({__grp:g.nome}, f)); });
@@ -3055,12 +2857,6 @@ function groupByCliAgrup(filiais, months){
 // Alguns grupos precisam aparecer INTEIROS para um único representante
 // (mesmo que as filiais estejam cadastradas em reps diferentes na planilha),
 // porque o representante precisa acompanhar o grupo todo.
-// Grupos que NÃO devem aparecer na análise de nenhum representante (contas retiradas).
-function grupoExcluido(cliAgrup){
-  const n = String(cliAgrup || '').toUpperCase();
-  if(n.indexOf('BRASILEIRA DE DISTRIBUICAO AUTOMOTIVA') >= 0) return true; // retirado do RBR / da análise
-  return false;
-}
 function repOverrideForGroup(cliAgrup){
   const n = String(cliAgrup || '').toUpperCase();
   if(n.indexOf('BEZERRA & OLIVEIRA') >= 0) return 'ATIVA';                       // BEZERRA & OLIVEIRA → ATIVA
@@ -3074,7 +2870,6 @@ function repOverrideForGroup(cliAgrup){
 function autoSplitByRep(parsed){
   const porRepFiliais = {};
   parsed.filiais.forEach(f => {
-    if(grupoExcluido(f.cliAgrup)) return;   // grupo retirado da análise
     // Se o grupo tem ajuste manual, TODAS as filiais vão para o rep definido.
     const rep = repOverrideForGroup(f.cliAgrup) || f.rep || 'SEM REPRESENTANTE';
     (porRepFiliais[rep] = porRepFiliais[rep] || []).push(f);
