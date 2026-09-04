@@ -2905,10 +2905,28 @@ async function importAllMapped(){
 function renderInativImported(){
   if(!INATIV_DATA || !INATIV_DATA.grupos || !INATIV_DATA.grupos.length) return;
   const m = INATIV_DATA.months;
+
+  // Contar quantos grupos não compraram em cada mês
+  const contarNaoComprou = (mesIdx) => {
+    let count = 0;
+    INATIV_DATA.grupos.forEach(grupo => {
+      if(grupo.vals && grupo.vals[mesIdx] === 'NÃO') {
+        count++;
+      }
+    });
+    return count;
+  };
+
+  const count1 = contarNaoComprou(0);
+  const count2 = contarNaoComprou(1);
+  const count3 = contarNaoComprou(2);
+
+  // Atualizar labels com contagem
   const lbl1=$('lbl-m1'), lbl2=$('lbl-m2'), lbl3=$('lbl-m3');
-  if(lbl1) lbl1.textContent = m[0] || 'Mês 1';
-  if(lbl2) lbl2.textContent = m[1] || 'Mês 2';
-  if(lbl3) lbl3.textContent = m[2] || 'Mês 3';
+  if(lbl1) lbl1.textContent = `${m[0] || 'Mês 1'}\n(${count1})`;
+  if(lbl2) lbl2.textContent = `${m[1] || 'Mês 2'}\n(${count2})`;
+  if(lbl3) lbl3.textContent = `${m[2] || 'Mês 3'}\n(${count3})`;
+
   const pl = $('inativ-period-label'); if(pl) pl.textContent = m.join(' · ');
   const ia = $('inativ-import-area'); if(ia) ia.style.display = 'none';
   const ir = $('inativ-results'); if(ir) ir.style.display = 'block';
