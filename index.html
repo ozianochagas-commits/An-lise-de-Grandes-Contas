@@ -2529,6 +2529,29 @@ function resultadoDoMes(monthKey){
   }catch(e){ return null; }
 }
 
+// Contar quantos CLIENTES/FILIAIS não compraram em um mês específico
+// Usado para sincronizar a contagem no KPI com a contagem nos headers dos meses
+function contarNaoComprouGlobal(mesIdx){
+  let count = 0;
+  const gruposFiltrados = getFilteredInativGrupos(); // Grupos que estão sendo exibidos
+  gruposFiltrados.forEach(grupo => {
+    // Se tem filiais, contar APENAS as filiais (não contar grupo)
+    if(grupo.filiais && grupo.filiais.length > 0) {
+      grupo.filiais.forEach(filial => {
+        if(filial.vals && filial.vals[mesIdx] === 0) {
+          count++;
+        }
+      });
+    } else {
+      // Se NÃO tem filiais, contar o próprio grupo
+      if(grupo.vals && grupo.vals[mesIdx] === 0) {
+        count++;
+      }
+    }
+  });
+  return count;
+}
+
 // Sincroniza o bloco "Resultado do Mês" da aba Clientes Inativos com o MÊS SELECIONADO
 // Usa currentMonth (mês selecionado no dropdown) em vez do mês da planilha
 function updateInativResultado(){
@@ -2546,6 +2569,24 @@ function updateInativResultado(){
       const ano = parts[0].slice(-2); // Pega últimos 2 dígitos do ano
       const mesAbrev = meses[mesNum] || '';
       sv('inativ-kpi-mes', 'em ' + mesAbrev + './' + ano);
+
+      // Atualizar a contagem de filiais que não compraram usando a mesma lógica dos headers
+      // Encontrar o índice correto no array INATIV_DATA.months correspondente ao mês selecionado
+      if(INATIV_DATA && INATIV_DATA.months && INATIV_DATA.months.length) {
+        // Procurar qual índice tem o mês selecionado
+        const monthSearch = mesAbrev + './' + ano; // ex: "Ago./26"
+        let mesIdx = -1;
+        for(let i = 0; i < INATIV_DATA.months.length; i++) {
+          if(INATIV_DATA.months[i] && INATIV_DATA.months[i].toLowerCase().includes(monthSearch.toLowerCase())) {
+            mesIdx = i;
+            break;
+          }
+        }
+        // Se achou o mês, contar; se não achou, usar o último
+        if(mesIdx === -1) mesIdx = INATIV_DATA.months.length - 1;
+        const countNaoComprou = contarNaoComprouGlobal(mesIdx);
+        sv('inativ-total', countNaoComprou.toString());
+      }
     }
   }
 
@@ -2906,31 +2947,10 @@ function renderInativImported(){
   if(!INATIV_DATA || !INATIV_DATA.grupos || !INATIV_DATA.grupos.length) return;
   const m = INATIV_DATA.months;
 
-  // Contar quantos CLIENTES/FILIAIS não compraram em cada mês
-  const contarNaoComprou = (mesIdx) => {
-    let count = 0;
-    const gruposFiltrados = getFilteredInativGrupos(); // Grupos que estão sendo exibidos
-    gruposFiltrados.forEach(grupo => {
-      // Se tem filiais, contar APENAS as filiais (não contar grupo)
-      if(grupo.filiais && grupo.filiais.length > 0) {
-        grupo.filiais.forEach(filial => {
-          if(filial.vals && filial.vals[mesIdx] === 0) {
-            count++;
-          }
-        });
-      } else {
-        // Se NÃO tem filiais, contar o próprio grupo
-        if(grupo.vals && grupo.vals[mesIdx] === 0) {
-          count++;
-        }
-      }
-    });
-    return count;
-  };
-
-  const count1 = contarNaoComprou(0);
-  const count2 = contarNaoComprou(1);
-  const count3 = contarNaoComprou(2);
+  // Contar quantos CLIENTES/FILIAIS não compraram em cada mês usando a função global
+  const count1 = contarNaoComprouGlobal(0);
+  const count2 = contarNaoComprouGlobal(1);
+  const count3 = contarNaoComprouGlobal(2);
 
   // Atualizar labels com contagem
   const lbl1=$('lbl-m1'), lbl2=$('lbl-m2'), lbl3=$('lbl-m3');
@@ -3215,9 +3235,9 @@ function applyInativFilter(){
 
   const filtered = getFilteredInativGrupos();
 
-  // KPI: grupos sem venda SÓ no último mês (grupo OU alguma filial)
+  // KPI: filiais sem venda SÓ no último mês (mesma contagem dos headers dos meses)
   const lastIdx = Math.max(0, INATIV_DATA.months.length - 1);
-  const semVendaCount = INATIV_DATA.grupos.filter(g => gGrupoTemSemVenda(g, lastIdx)).length;
+  const semVendaCount = contarNaoComprouGlobal(lastIdx);
   sv('inativ-total', semVendaCount.toString());
   sv('inativ-kpi-mes', 'em ' + (INATIV_DATA.months[lastIdx] || ''));
 
