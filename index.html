@@ -3235,11 +3235,32 @@ function applyInativFilter(){
 
   const filtered = getFilteredInativGrupos();
 
-  // KPI: filiais sem venda SÓ no último mês (mesma contagem dos headers dos meses)
-  const lastIdx = Math.max(0, INATIV_DATA.months.length - 1);
-  const semVendaCount = contarNaoComprouGlobal(lastIdx);
+  // KPI: filiais sem venda no MÊS SELECIONADO (não sempre no último)
+  // Se currentMonth está definido, encontrar seu índice nos meses importados
+  let mesIdx = Math.max(0, INATIV_DATA.months.length - 1); // default: último mês
+
+  if(currentMonth && INATIV_DATA.months && INATIV_DATA.months.length) {
+    const meses = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const parts = currentMonth.split('-');
+    if(parts.length === 2) {
+      const mesNum = parseInt(parts[1]);
+      const ano = parts[0].slice(-2);
+      const mesAbrev = meses[mesNum] || '';
+      const monthSearch = mesAbrev + './' + ano;
+
+      // Procurar qual índice tem este mês
+      for(let i = 0; i < INATIV_DATA.months.length; i++) {
+        if(INATIV_DATA.months[i] && INATIV_DATA.months[i].toLowerCase().includes(monthSearch.toLowerCase())) {
+          mesIdx = i;
+          break;
+        }
+      }
+    }
+  }
+
+  const semVendaCount = contarNaoComprouGlobal(mesIdx);
   sv('inativ-total', semVendaCount.toString());
-  sv('inativ-kpi-mes', 'em ' + (INATIV_DATA.months[lastIdx] || ''));
+  sv('inativ-kpi-mes', 'em ' + (INATIV_DATA.months[mesIdx] || ''));
 
   if(filtered.length === 0){
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:20px">Nenhum grupo neste filtro</td></tr>';
