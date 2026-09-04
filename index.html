@@ -2416,51 +2416,54 @@ function changeMonth(){
   // 6. Renderiza inputs (agora com valores padrão de BASE)
   renderEditTable();
 
-  // 7. PRIMEIRO: Carrega dados do Supabase (dados FRESCOS)
+  // 7. FORÇAR RECARREGAR DO SUPABASE (com cache bypass)
   const mesSupabase = newMonth + '-01';
+  const cacheBypass = `&t=${Date.now()}`; // força recarregar, não usa cache
 
-  // Usar Promise.all para carregar dados E clientes em paralelo
-  Promise.all([
-    carregarDadosSupabase(mesSupabase),
-    carregarClientesSupabase(mesSupabase)
-  ]).then(([dadosSupabase, clientes]) => {
-    let deuCerto = false;
+  console.log('🔄 Tentando carregar dados para:', mesSupabase);
 
-    // Se conseguiu dados do Supabase, usar eles
+  // LIMPAR BASE completamente ANTES de carregar
+  BASE.length = 0;
+
+  // Carregar DO SUPABASE COM PRIORIDADE ABSOLUTA
+  carregarDadosSupabase(mesSupabase).then(dadosSupabase => {
+    console.log('📡 Resposta Supabase:', dadosSupabase);
+
     if (dadosSupabase && dadosSupabase.length > 0) {
       const baseAtualizado = mapearDadosSupabase(dadosSupabase);
       if (baseAtualizado && baseAtualizado.length > 0) {
-        BASE.length = 0;
         BASE.push(...baseAtualizado);
-        deuCerto = true;
-        console.log('✅ BASE atualizado com dados FRESCOS do Supabase para:', mesSupabase);
+        console.log('✅ SUCESSO: Dados carregados do Supabase para', mesSupabase, 'Total:', baseAtualizado.length);
+      } else {
+        console.log('⚠️ Supabase retornou dados mas mapearDadosSupabase retornou vazio');
+        loadData(); // fallback
       }
+    } else {
+      console.log('⚠️ Supabase retornou vazio para', mesSupabase, '- usando localStorage');
+      loadData(); // fallback para localStorage
     }
 
-    // Se não conseguiu do Supabase, tenta localStorage como fallback
-    if (!deuCerto) {
-      console.log('ℹ️ Tentando fallback do localStorage para:', newMonth);
-      loadData();
-      loadClientsData();
-    }
-
-    // Renderiza e recalcula
+    // RENDERIZAR E RECALCULAR
     renderEditTable();
     recalc();
     updateInativMesNome();
-
-    // Notificação
     showNotification(`📅 ${monthNames[newMonth]}`);
   }).catch(error => {
-    console.warn('⚠️ Erro ao carregar dados, usando localStorage:', error);
-    // Fallback: carregar do localStorage
+    console.error('❌ ERRO ao carregar Supabase:', error);
+    console.log('🔙 Fallback para localStorage');
     loadData();
-    loadClientsData();
     renderEditTable();
     recalc();
     updateInativMesNome();
     showNotification(`📅 ${monthNames[newMonth]}`);
   });
+
+  // Também carregar clientes em paralelo (sem bloqueio)
+  carregarClientesSupabase(mesSupabase).then(clientes => {
+    if (clientes && clientes.length > 0) {
+      console.log('✅ Clientes carregados:', clientes.length);
+    }
+  }).catch(e => console.warn('⚠️ Erro ao carregar clientes:', e));
 }
 
 function setAutoDate(){
