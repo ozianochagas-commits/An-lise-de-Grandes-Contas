@@ -2233,6 +2233,8 @@ function toggleFilterMenu(){
   } else {
     menu.style.display = 'block';
     btn.classList.add('active');
+    // Sincronizar o texto do filtro quando o menu abre
+    updateFilterText();
   }
 }
 
