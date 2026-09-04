@@ -852,7 +852,7 @@
       <p>Edite diretamente: <strong>META</strong>, <strong>REALIZADO</strong> e <strong>CENÁRIO COMERCIAL</strong>.<br>
          Todos os cálculos atualizam automaticamente em tempo real.</p>
     </div>
-    <div class="htotal"><span>Projeção Total</span><strong id="hero-proj">—</strong><span id="hero-pct">— da meta</span></div>
+    <div class="htotal"><span>Projeção Total</span><strong id="hero-proj">—</strong><span id="hero-pct">— da meta</span><br><span id="hero-mes" style="font-size:12px;color:#999;margin-top:6px;display:block;">Mês</span></div>
   </div>
   <div class="pgrid">
     <div class="pcard a"><div class="pcl">Total Meta</div><div class="pcv" id="pv-meta">—</div><div class="pcs">Objetivo do mês</div></div>
@@ -1751,7 +1751,10 @@ function recalc(){
   sv('pv-proj',R(aProj)); sv('pv-pct',P(aPrj)+' da meta');
   sv('pv-atp',P(aAtp)); sv('pv-prj',P(aPrj));
   sv('hero-proj',R(aProj)); sv('hero-pct',P(aPrj)+' da meta');
-  
+  // Atualiza o nome do mês na Projeção Total
+  const mesMostrado = monthFullName(currentMonth) || 'Mês';
+  sv('hero-mes', mesMostrado);
+
   // Renderiza dashboard com os valores atualizados (para atualizar tabela, KPIs e gráfico)
   renderDashboard(isAll ? vals : disp);
   
