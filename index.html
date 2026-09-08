@@ -3060,14 +3060,22 @@ async function parseGrandesContas(zip){
     });
   }
 
-  // 3. localiza a 1ª planilha
-  let sheetPath = 'xl/worksheets/sheet1.xml';
-  if(!zip.file(sheetPath)){
-    const cand = Object.keys(zip.files).find(f => /xl\/worksheets\/sheet\d+\.xml$/.test(f));
-    if(cand) sheetPath = cand;
+  // 3. localiza TODAS as planilhas (não apenas a primeira)
+  const sheetPaths = Object.keys(zip.files)
+    .filter(f => /xl\/worksheets\/sheet\d+\.xml$/.test(f))
+    .sort((a, b) => {
+      const numA = parseInt(a.match(/sheet(\d+)/)[1]);
+      const numB = parseInt(b.match(/sheet(\d+)/)[1]);
+      return numA - numB;
+    });
+
+  let allRows = [];
+  for(const sheetPath of sheetPaths){
+    const sheetXml = await zip.file(sheetPath).async('string');
+    const sheetRows = sheetXml.match(/<row[^>]*>[\s\S]*?<\/row>/g) || [];
+    allRows = allRows.concat(sheetRows);
   }
-  const sheetXml = await zip.file(sheetPath).async('string');
-  const rows = sheetXml.match(/<row[^>]*>[\s\S]*?<\/row>/g) || [];
+  const rows = allRows;
 
   function cellVal(cellXml){
     if(!cellXml) return null;
@@ -3553,11 +3561,8 @@ function gerarLinkPorRep(){
     resMes: rMes
   };
   // Agora tenta TinyURL para encurtar e passar no WhatsApp, com fallback para link longo embutido
-  // Adiciona o grupo(s) ao label para exibição
-  const grupos = (dados.grupos || []).map(g => g.nome);
-  const grupoLabel = grupos.length === 1 ? `${rep} - ${grupos[0]}` : `${rep} (${grupos.length} grupos)`;
   mostrarLinkGerando();
-  empacotarLinkPorRep(payload, grupoLabel);
+  empacotarLinkPorRep(payload, rep);
 }
 
 // Versão de empacotarLink específica para links por representante
