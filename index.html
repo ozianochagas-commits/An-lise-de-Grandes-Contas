@@ -2906,23 +2906,12 @@ function renderInativImported(){
   if(!INATIV_DATA || !INATIV_DATA.grupos || !INATIV_DATA.grupos.length) return;
   const m = INATIV_DATA.months;
 
-  // Contar quantos CLIENTES/FILIAIS não compraram em cada mês
+  // Contar quantos grupos não compraram em cada mês
   const contarNaoComprou = (mesIdx) => {
     let count = 0;
-    const gruposFiltrados = getFilteredInativGrupos(); // Grupos que estão sendo exibidos
-    gruposFiltrados.forEach(grupo => {
-      // Se tem filiais, contar APENAS as filiais (não contar grupo)
-      if(grupo.filiais && grupo.filiais.length > 0) {
-        grupo.filiais.forEach(filial => {
-          if(filial.vals && filial.vals[mesIdx] === 0) {
-            count++;
-          }
-        });
-      } else {
-        // Se NÃO tem filiais, contar o próprio grupo
-        if(grupo.vals && grupo.vals[mesIdx] === 0) {
-          count++;
-        }
+    INATIV_DATA.grupos.forEach(grupo => {
+      if(grupo.vals && grupo.vals[mesIdx] === 'NÃO') {
+        count++;
       }
     });
     return count;
