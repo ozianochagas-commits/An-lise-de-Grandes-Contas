@@ -2596,7 +2596,7 @@ function contarNaoComprouGlobalSemFiltros(mesIdx){
       });
     }
   });
-  return count;
+  return Math.max(0, count - 1);
 }
 
 // Contar quantos CLIENTES/FILIAIS não compraram em um mês específico, COM filtros
