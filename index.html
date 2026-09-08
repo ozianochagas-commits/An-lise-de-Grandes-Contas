@@ -2577,7 +2577,31 @@ function resultadoDoMes(monthKey){
   }catch(e){ return null; }
 }
 
-// Contar quantos CLIENTES/FILIAIS não compraram em um mês específico
+// Contar quantos CLIENTES/FILIAIS não compraram em um mês específico, SEM filtros
+// Usado nos headers dos meses para mostrar contagem total
+function contarNaoComprouGlobalSemFiltros(mesIdx){
+  let count = 0;
+  if(!INATIV_DATA || !INATIV_DATA.grupos) return 0;
+
+  INATIV_DATA.grupos.forEach(grupo => {
+    // Se tem filiais, contar APENAS as filiais (não contar grupo)
+    if(grupo.filiais && grupo.filiais.length > 0) {
+      grupo.filiais.forEach(filial => {
+        if(filial.vals && filial.vals[mesIdx] === 0) {
+          count++;
+        }
+      });
+    } else {
+      // Se NÃO tem filiais, contar o próprio grupo
+      if(grupo.vals && grupo.vals[mesIdx] === 0) {
+        count++;
+      }
+    }
+  });
+  return count;
+}
+
+// Contar quantos CLIENTES/FILIAIS não compraram em um mês específico, COM filtros
 // Usado para sincronizar a contagem no KPI com a contagem nos headers dos meses
 function contarNaoComprouGlobal(mesIdx){
   let count = 0;
@@ -2995,10 +3019,10 @@ function renderInativImported(){
   if(!INATIV_DATA || !INATIV_DATA.grupos || !INATIV_DATA.grupos.length) return;
   const m = INATIV_DATA.months;
 
-  // Contar quantos CLIENTES/FILIAIS não compraram em cada mês usando a função global
-  const count1 = contarNaoComprouGlobal(0);
-  const count2 = contarNaoComprouGlobal(1);
-  const count3 = contarNaoComprouGlobal(2);
+  // Contar quantos CLIENTES/FILIAIS não compraram em cada mês SEM aplicar filtros
+  const count1 = contarNaoComprouGlobalSemFiltros(0);
+  const count2 = contarNaoComprouGlobalSemFiltros(1);
+  const count3 = contarNaoComprouGlobalSemFiltros(2);
 
   // Atualizar labels com contagem
   const lbl1=$('lbl-m1'), lbl2=$('lbl-m2'), lbl3=$('lbl-m3');
