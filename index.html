@@ -2596,7 +2596,7 @@ function contarNaoComprouGlobalSemFiltros(mesIdx){
       });
     }
   });
-  return Math.max(0, count - 1);
+  return Math.max(0, count);
 }
 
 // Contar quantos CLIENTES/FILIAIS não compraram em um mês específico, COM filtros
@@ -2655,7 +2655,7 @@ function updateInativResultado(){
         // Se achou o mês, contar; se não achou, usar o último
         if(mesIdx === -1) mesIdx = INATIV_DATA.months.length - 1;
         const countNaoComprou = contarNaoComprouGlobalSemFiltros(mesIdx);
-        sv('inativ-total', countNaoComprou.toString());
+        sv('inativ-total', Math.max(0, countNaoComprou - 1).toString());
       }
     }
   }
@@ -3018,9 +3018,9 @@ function renderInativImported(){
   const m = INATIV_DATA.months;
 
   // Contar quantos CLIENTES/FILIAIS não compraram em cada mês SEM aplicar filtros
-  const count1 = contarNaoComprouGlobalSemFiltros(0);
-  const count2 = contarNaoComprouGlobalSemFiltros(1);
-  const count3 = contarNaoComprouGlobalSemFiltros(2);
+  const count1 = Math.max(0, contarNaoComprouGlobalSemFiltros(0) - 1);
+  const count2 = Math.max(0, contarNaoComprouGlobalSemFiltros(1) - 1);
+  const count3 = Math.max(0, contarNaoComprouGlobalSemFiltros(2) - 1);
 
   // Atualizar labels com contagem
   const lbl1=$('lbl-m1'), lbl2=$('lbl-m2'), lbl3=$('lbl-m3');
@@ -3329,7 +3329,7 @@ function applyInativFilter(){
   }
 
   const semVendaCount = contarNaoComprouGlobalSemFiltros(mesIdx);
-  sv('inativ-total', semVendaCount.toString());
+  sv('inativ-total', Math.max(0, semVendaCount - 1).toString());
   sv('inativ-kpi-mes', 'em ' + (INATIV_DATA.months[mesIdx] || ''));
 
   if(filtered.length === 0){
