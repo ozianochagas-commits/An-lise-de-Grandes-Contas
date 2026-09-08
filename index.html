@@ -3060,22 +3060,14 @@ async function parseGrandesContas(zip){
     });
   }
 
-  // 3. localiza TODAS as planilhas (não apenas a primeira)
-  const sheetPaths = Object.keys(zip.files)
-    .filter(f => /xl\/worksheets\/sheet\d+\.xml$/.test(f))
-    .sort((a, b) => {
-      const numA = parseInt(a.match(/sheet(\d+)/)[1]);
-      const numB = parseInt(b.match(/sheet(\d+)/)[1]);
-      return numA - numB;
-    });
-
-  let allRows = [];
-  for(const sheetPath of sheetPaths){
-    const sheetXml = await zip.file(sheetPath).async('string');
-    const sheetRows = sheetXml.match(/<row[^>]*>[\s\S]*?<\/row>/g) || [];
-    allRows = allRows.concat(sheetRows);
+  // 3. localiza a 1ª planilha
+  let sheetPath = 'xl/worksheets/sheet1.xml';
+  if(!zip.file(sheetPath)){
+    const cand = Object.keys(zip.files).find(f => /xl\/worksheets\/sheet\d+\.xml$/.test(f));
+    if(cand) sheetPath = cand;
   }
-  const rows = allRows;
+  const sheetXml = await zip.file(sheetPath).async('string');
+  const rows = sheetXml.match(/<row[^>]*>[\s\S]*?<\/row>/g) || [];
 
   function cellVal(cellXml){
     if(!cellXml) return null;
@@ -3172,13 +3164,28 @@ function repOverrideForGroup(cliAgrup){
   return null;
 }
 
+// Override de filiais específicas (por nome e UF)
+function repOverrideForFilial(filialNome, uf){
+  const nome = String(filialNome || '').toUpperCase();
+  const estado = String(uf || '').toUpperCase();
+
+  // PMZ DISTRIBUIDORA S.A CE (6923) → PEREIRA E MEDINA
+  if((nome.indexOf('PMZ') >= 0 && estado === 'CE') || nome.indexOf('6923') >= 0) return 'PEREIRA E MEDINA';
+
+  return null;
+}
+
 // Divide por representante (usa o rep de CADA filial), regrupando por CliAgrup
 function autoSplitByRep(parsed){
   const porRepFiliais = {};
   parsed.filiais.forEach(f => {
     if(grupoExcluido(f.cliAgrup)) return;   // grupo retirado da análise
+    // Se a filial tem ajuste manual, vai para o rep definido
+    let rep = repOverrideForFilial(f.cliAgrup, f.uf);
     // Se o grupo tem ajuste manual, TODAS as filiais vão para o rep definido.
-    const rep = repOverrideForGroup(f.cliAgrup) || f.rep || 'SEM REPRESENTANTE';
+    if(!rep) rep = repOverrideForGroup(f.cliAgrup);
+    // Senão, usa o representante da filial
+    if(!rep) rep = f.rep || 'SEM REPRESENTANTE';
     (porRepFiliais[rep] = porRepFiliais[rep] || []).push(f);
   });
   const out = {};
