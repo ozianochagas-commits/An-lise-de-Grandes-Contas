@@ -2450,14 +2450,20 @@ function changeMonth(){
   // 6. Renderiza inputs (agora com valores padrão de BASE)
   renderEditTable();
 
-  // 7. FORÇAR RECARREGAR DO SUPABASE (com cache bypass)
+  // 7. SALVAR valores padrão ANTES de tentar carregar Supabase
+  const baseDefault = BASE.map(r => ({
+    name: r.name,
+    meta: r.meta,
+    real: r.real,
+    prev: r.prev,
+    car: r.car
+  }));
+
+  // 8. FORÇAR RECARREGAR DO SUPABASE (com cache bypass)
   const mesSupabase = newMonth + '-01';
   const cacheBypass = `&t=${Date.now()}`; // força recarregar, não usa cache
 
   console.log('🔄 Tentando carregar dados para:', mesSupabase);
-
-  // LIMPAR BASE completamente ANTES de carregar
-  BASE.length = 0;
 
   // Carregar DO SUPABASE COM PRIORIDADE ABSOLUTA
   carregarDadosSupabase(mesSupabase).then(dadosSupabase => {
@@ -2466,11 +2472,13 @@ function changeMonth(){
     if (dadosSupabase && dadosSupabase.length > 0) {
       const baseAtualizado = mapearDadosSupabase(dadosSupabase);
       if (baseAtualizado && baseAtualizado.length > 0) {
+        // Limpar e atualizar BASE com dados do Supabase
+        BASE.length = 0;
         BASE.push(...baseAtualizado);
         console.log('✅ SUCESSO: Dados carregados do Supabase para', mesSupabase, 'Total:', baseAtualizado.length);
       } else {
         console.log('⚠️ Supabase retornou dados mas mapearDadosSupabase retornou vazio');
-        loadData(); // fallback
+        loadData(); // fallback para localStorage
       }
     } else {
       console.log('⚠️ Supabase retornou vazio para', mesSupabase, '- usando localStorage');
