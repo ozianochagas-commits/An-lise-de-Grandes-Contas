@@ -3169,9 +3169,9 @@ function repOverrideForFilial(filialNome, uf){
   const nome = String(filialNome || '').toUpperCase();
   const estado = String(uf || '').toUpperCase();
 
-  // PMZ DISTRIBUIDORA S.A MA (7929) → PEREIRA E MEDINA
+  // PMZ DISTRIBUIDORA S.A MA (7929, 7090) → PEREIRA E MEDINA
   if((nome.indexOf('PMZ') >= 0 && estado === 'MA') ||
-     nome.indexOf('7929') >= 0) return 'PEREIRA E MEDINA';
+     nome.indexOf('7929') >= 0 || nome.indexOf('7090') >= 0) return 'PEREIRA E MEDINA';
 
   return null;
 }
