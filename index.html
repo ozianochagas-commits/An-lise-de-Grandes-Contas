@@ -2654,7 +2654,7 @@ function updateInativResultado(){
         }
         // Se achou o mês, contar; se não achou, usar o último
         if(mesIdx === -1) mesIdx = INATIV_DATA.months.length - 1;
-        const countNaoComprou = contarNaoComprouGlobal(mesIdx);
+        const countNaoComprou = contarNaoComprouGlobalSemFiltros(mesIdx);
         sv('inativ-total', countNaoComprou.toString());
       }
     }
@@ -3328,7 +3328,7 @@ function applyInativFilter(){
     }
   }
 
-  const semVendaCount = contarNaoComprouGlobal(mesIdx);
+  const semVendaCount = contarNaoComprouGlobalSemFiltros(mesIdx);
   sv('inativ-total', semVendaCount.toString());
   sv('inativ-kpi-mes', 'em ' + (INATIV_DATA.months[mesIdx] || ''));
 
