@@ -3491,9 +3491,22 @@ async function empacotarLink(payload, repLabel){
       let id = (resp.headers.get('Location')||'').split('/').pop();
       if(id){ mostrarLinkModal(base + '#b=' + id, repLabel, true); return; }
     }
-  }catch(e){ /* sem internet / CORS / serviço fora → usa reserva */ }
+  }catch(e){ /* sem internet / CORS / serviço fora → tenta TinyURL */ }
 
-  // 2) reserva: link longo com dados embutidos
+  // 2) fallback: tenta TinyURL para encurtar o link longo
+  try{
+    const comp = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+    const longLink = base + '#d=' + comp;
+    const tinyResp = await fetch('https://tinyurl.com/api/create.php?url=' + encodeURIComponent(longLink));
+    if(tinyResp.ok){
+      const tinyUrl = await tinyResp.text();
+      if(tinyUrl && tinyUrl.indexOf('tinyurl') > -1){
+        mostrarLinkModal(tinyUrl, repLabel, true); return;
+      }
+    }
+  }catch(e){ /* TinyURL também falhou → usa reserva */ }
+
+  // 3) reserva: link longo com dados embutidos
   try{
     const comp = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
     mostrarLinkModal(base + '#d=' + comp, repLabel, false);
@@ -3539,11 +3552,36 @@ function gerarLinkPorRep(){
     mesNome: monthFullName(mKey) || '',
     resMes: rMes
   };
-  // Link INSTANTÂNEO com os dados embutidos — funciona sempre, sem depender de
-  // internet/nuvem (que às vezes falhava). Abre com SÓ a informação do rep escolhido.
+  // Agora tenta TinyURL para encurtar e passar no WhatsApp, com fallback para link longo embutido
+  // Adiciona o grupo(s) ao label para exibição
+  const grupos = (dados.grupos || []).map(g => g.nome);
+  const grupoLabel = grupos.length === 1 ? `${rep} - ${grupos[0]}` : `${rep} (${grupos.length} grupos)`;
+  mostrarLinkGerando();
+  empacotarLinkPorRep(payload, grupoLabel);
+}
+
+// Versão de empacotarLink específica para links por representante
+async function empacotarLinkPorRep(payload, repLabel){
+  const base = location.origin + location.pathname;
+  payload = minifyForShare(payload);
+
+  // Tenta TinyURL para encurtar o link longo
   try{
-    const link = linkEmbutido(payload);
-    mostrarLinkModal(link, rep, true);
+    const comp = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+    const longLink = base + '#d=' + comp;
+    const tinyResp = await fetch('https://tinyurl.com/api/create.php?url=' + encodeURIComponent(longLink));
+    if(tinyResp.ok){
+      const tinyUrl = await tinyResp.text();
+      if(tinyUrl && tinyUrl.indexOf('tinyurl') > -1){
+        mostrarLinkModal(tinyUrl, repLabel, true); return;
+      }
+    }
+  }catch(e){ /* TinyURL falhou → usa fallback */ }
+
+  // Fallback: link longo com dados embutidos
+  try{
+    const comp = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+    mostrarLinkModal(base + '#d=' + comp, repLabel, false);
   }catch(e){ alert('Erro ao gerar o link.'); }
 }
 
