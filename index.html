@@ -2260,11 +2260,21 @@ document.addEventListener('click', function(event){
 // Aplica apenas a visibilidade das linhas sem recalcular KPIs
 function applyFilterVisibility(){
   const checkboxes = document.querySelectorAll('.rep-checkbox');
-  if(checkboxes.length === 0) return; // Se não há checkboxes ainda, sai
+  if(checkboxes.length === 0) {
+    // Se não há checkboxes ainda, mostra todas as linhas
+    document.querySelectorAll('.edit-row, .trim-row').forEach(tr => tr.style.display = '');
+    return;
+  }
 
   const selectedIndices = Array.from(checkboxes)
     .filter(cb => cb.checked)
     .map(cb => parseInt(cb.dataset.idx));
+
+  // Se nenhum está selecionado, mostra TODOS (filtro limpo)
+  if(selectedIndices.length === 0){
+    document.querySelectorAll('.edit-row, .trim-row').forEach(tr => tr.style.display = '');
+    return;
+  }
 
   // Mostra/oculta linhas da tabela "Editar Dados"
   document.querySelectorAll('.edit-row').forEach(tr=>{
@@ -2439,7 +2449,6 @@ function changeMonth(){
 
   // 6. Renderiza inputs (agora com valores padrão de BASE)
   renderEditTable();
-  applyFilterVisibility(); // Re-aplica visibilidade dos filtros após reconstruir tabela
 
   // 7. FORÇAR RECARREGAR DO SUPABASE (com cache bypass)
   const mesSupabase = newMonth + '-01';
@@ -2470,7 +2479,6 @@ function changeMonth(){
 
     // RENDERIZAR E RECALCULAR
     renderEditTable();
-    applyFilterVisibility(); // Re-aplica visibilidade após renderizar
     recalc();
     updateInativMesNome();
     showNotification(`📅 ${monthNames[newMonth]}`);
@@ -2479,7 +2487,6 @@ function changeMonth(){
     console.log('🔙 Fallback para localStorage');
     loadData();
     renderEditTable();
-    applyFilterVisibility(); // Re-aplica visibilidade após renderizar
     recalc();
     updateInativMesNome();
     showNotification(`📅 ${monthNames[newMonth]}`);
