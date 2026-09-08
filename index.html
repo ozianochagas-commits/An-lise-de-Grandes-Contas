@@ -2584,6 +2584,9 @@ function contarNaoComprouGlobalSemFiltros(mesIdx){
   if(!INATIV_DATA || !INATIV_DATA.grupos) return 0;
 
   INATIV_DATA.grupos.forEach(grupo => {
+    // Pular grupos excluídos da análise
+    if(grupoExcluido(grupo.nome)) return;
+
     // Contar APENAS as filiais que não compraram
     if(grupo.filiais && grupo.filiais.length > 0) {
       grupo.filiais.forEach(filial => {
