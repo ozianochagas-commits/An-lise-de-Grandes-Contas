@@ -852,7 +852,7 @@
       <p>Edite diretamente: <strong>META</strong>, <strong>REALIZADO</strong> e <strong>CENÁRIO COMERCIAL</strong>.<br>
          Todos os cálculos atualizam automaticamente em tempo real.</p>
     </div>
-    <div class="htotal"><span>Projeção Total</span><strong id="hero-proj">—</strong><span id="hero-pct">— da meta</span></div>
+    <div class="htotal"><span>Projeção Total</span><strong id="hero-proj">—</strong><span id="hero-pct">— da meta</span><br><span id="hero-mes" style="font-size:12px;color:#999;margin-top:6px;display:block;">Mês</span></div>
   </div>
   <div class="pgrid">
     <div class="pcard a"><div class="pcl">Total Meta</div><div class="pcv" id="pv-meta">—</div><div class="pcs">Objetivo do mês</div></div>
@@ -1751,7 +1751,10 @@ function recalc(){
   sv('pv-proj',R(aProj)); sv('pv-pct',P(aPrj)+' da meta');
   sv('pv-atp',P(aAtp)); sv('pv-prj',P(aPrj));
   sv('hero-proj',R(aProj)); sv('hero-pct',P(aPrj)+' da meta');
-  
+  // Atualiza o nome do mês na Projeção Total
+  const mesMostrado = monthFullName(currentMonth) || 'Mês';
+  sv('hero-mes', mesMostrado);
+
   // Renderiza dashboard com os valores atualizados (para atualizar tabela, KPIs e gráfico)
   renderDashboard(isAll ? vals : disp);
   
@@ -2731,6 +2734,7 @@ function loadInativByRep(){
     }
   }catch(e){ INATIV_BY_REP = {}; }
   applyGroupOverrides();   // corrige grupos com ajuste manual mesmo em dados já salvos
+  applyFilialOverrides();  // corrige filiais individuais com ajuste manual
 }
 
 // Reagrupa TODAS as filiais dos grupos com ajuste manual (repOverrideForGroup)
@@ -2764,6 +2768,52 @@ function applyGroupOverrides(){
   });
   // 3) remove representantes que ficaram sem nenhum grupo
   Object.keys(INATIV_BY_REP).forEach(rep => { if(!(INATIV_BY_REP[rep].grupos || []).length) delete INATIV_BY_REP[rep]; });
+}
+
+// Aplica overrides de filiais específicas (move filiais individuais para representantes diferentes)
+function applyFilialOverrides(){
+  if(!INATIV_BY_REP || !Object.keys(INATIV_BY_REP).length) return;
+  const months = (Object.values(INATIV_BY_REP)[0] || {}).months || [];
+  const moves = {};   // rep alvo → lista de filiais a mover
+
+  // 1) retira filiais com override de onde estiverem
+  Object.keys(INATIV_BY_REP).forEach(rep => {
+    (INATIV_BY_REP[rep].grupos || []).forEach(g => {
+      const filialsContinue = [];
+      (g.filiais || []).forEach(f => {
+        const target = repOverrideForFilial(g.nome, f.uf);
+        if(target && target !== rep){
+          (moves[target] = moves[target] || []).push(Object.assign({__grp:g.nome}, f));
+        } else {
+          filialsContinue.push(f);
+        }
+      });
+      g.filiais = filialsContinue;
+      // recalcula totals do grupo
+      g.vals = [0,0,0];
+      g.filiais.forEach(f => {
+        for(let k=0;k<3;k++) g.vals[k] += (f.vals[k] || 0);
+      });
+    });
+  });
+
+  // 2) recoloca as filiais no representante certo
+  Object.keys(moves).forEach(rep => {
+    if(!INATIV_BY_REP[rep]) INATIV_BY_REP[rep] = {months, grupos: []};
+    const byNome = {}; (INATIV_BY_REP[rep].grupos || []).forEach(g => byNome[g.nome] = g);
+    moves[rep].forEach(f => {
+      let g = byNome[f.__grp];
+      if(!g){ g = {nome: f.__grp, vals:[0,0,0], filiais: []}; byNome[f.__grp] = g; INATIV_BY_REP[rep].grupos.push(g); }
+      g.filiais.push({nome: f.nome, vals: f.vals, familias: f.familias, uf: f.uf, rep: f.rep});
+      for(let k=0;k<3;k++) g.vals[k] += (f.vals[k] || 0);
+    });
+  });
+
+  // 3) remove grupos que ficaram sem filiais e representantes sem grupos
+  Object.keys(INATIV_BY_REP).forEach(rep => {
+    INATIV_BY_REP[rep].grupos = (INATIV_BY_REP[rep].grupos || []).filter(g => g.filiais.length > 0);
+    if(!INATIV_BY_REP[rep].grupos.length) delete INATIV_BY_REP[rep];
+  });
 }
 
 // Reconstrói o seletor de representante da aba (a partir dos dados importados)
@@ -2943,6 +2993,7 @@ async function importInativExcel(event){
 
     if(detectouRep){
       applyGroupOverrides();   // garante grupos com ajuste manual no rep certo
+      applyFilialOverrides();  // garante filiais com ajuste manual no rep certo
       saveInativByRep();
       statusEl.textContent = '';
       rebuildInativRepSelect();
