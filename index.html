@@ -2233,6 +2233,8 @@ function toggleFilterMenu(){
   } else {
     menu.style.display = 'block';
     btn.classList.add('active');
+    // Sincronizar o texto do filtro quando o menu abre
+    updateFilterText();
   }
 }
 
@@ -2254,6 +2256,28 @@ document.addEventListener('click', function(event){
     closeModalPrev();
   }
 });
+
+// Aplica apenas a visibilidade das linhas sem recalcular KPIs
+function applyFilterVisibility(){
+  const checkboxes = document.querySelectorAll('.rep-checkbox');
+  if(checkboxes.length === 0) return; // Se não há checkboxes ainda, sai
+
+  const selectedIndices = Array.from(checkboxes)
+    .filter(cb => cb.checked)
+    .map(cb => parseInt(cb.dataset.idx));
+
+  // Mostra/oculta linhas da tabela "Editar Dados"
+  document.querySelectorAll('.edit-row').forEach(tr=>{
+    const idx = parseInt(tr.dataset.idx);
+    tr.style.display = selectedIndices.includes(idx) ? '' : 'none';
+  });
+
+  // Mostra/oculta linhas da tabela "Trimestre"
+  document.querySelectorAll('.trim-row').forEach(tr=>{
+    const idx = parseInt(tr.dataset.idx);
+    tr.style.display = selectedIndices.includes(idx) ? '' : 'none';
+  });
+}
 
 // Atualiza o texto do botão e o estado do checkbox "Todos"
 function updateFilterText(){
@@ -2415,6 +2439,7 @@ function changeMonth(){
 
   // 6. Renderiza inputs (agora com valores padrão de BASE)
   renderEditTable();
+  applyFilterVisibility(); // Re-aplica visibilidade dos filtros após reconstruir tabela
 
   // 7. FORÇAR RECARREGAR DO SUPABASE (com cache bypass)
   const mesSupabase = newMonth + '-01';
@@ -2445,6 +2470,7 @@ function changeMonth(){
 
     // RENDERIZAR E RECALCULAR
     renderEditTable();
+    applyFilterVisibility(); // Re-aplica visibilidade após renderizar
     recalc();
     updateInativMesNome();
     showNotification(`📅 ${monthNames[newMonth]}`);
@@ -2453,9 +2479,16 @@ function changeMonth(){
     console.log('🔙 Fallback para localStorage');
     loadData();
     renderEditTable();
+    applyFilterVisibility(); // Re-aplica visibilidade após renderizar
     recalc();
     updateInativMesNome();
     showNotification(`📅 ${monthNames[newMonth]}`);
+  }).finally(() => {
+    // ✅ GARANTIR SINCRONIZAÇÃO FINAL DE TODOS OS DISPLAYS
+    const selector = $('month-selector');
+    const hdrMonth = $('hdr-month');
+    if(selector) selector.value = currentMonth;
+    if(hdrMonth) hdrMonth.textContent = monthNames[currentMonth];
   });
 
   // Também carregar clientes em paralelo (sem bloqueio)
@@ -2529,6 +2562,29 @@ function resultadoDoMes(monthKey){
   }catch(e){ return null; }
 }
 
+// Contar quantos CLIENTES/FILIAIS não compraram em um mês específico
+// Usado para sincronizar a contagem no KPI com a contagem nos headers dos meses
+function contarNaoComprouGlobal(mesIdx){
+  let count = 0;
+  const gruposFiltrados = getFilteredInativGrupos(); // Grupos que estão sendo exibidos
+  gruposFiltrados.forEach(grupo => {
+    // Se tem filiais, contar APENAS as filiais (não contar grupo)
+    if(grupo.filiais && grupo.filiais.length > 0) {
+      grupo.filiais.forEach(filial => {
+        if(filial.vals && filial.vals[mesIdx] === 0) {
+          count++;
+        }
+      });
+    } else {
+      // Se NÃO tem filiais, contar o próprio grupo
+      if(grupo.vals && grupo.vals[mesIdx] === 0) {
+        count++;
+      }
+    }
+  });
+  return count;
+}
+
 // Sincroniza o bloco "Resultado do Mês" da aba Clientes Inativos com o MÊS SELECIONADO
 // Usa currentMonth (mês selecionado no dropdown) em vez do mês da planilha
 function updateInativResultado(){
@@ -2546,6 +2602,24 @@ function updateInativResultado(){
       const ano = parts[0].slice(-2); // Pega últimos 2 dígitos do ano
       const mesAbrev = meses[mesNum] || '';
       sv('inativ-kpi-mes', 'em ' + mesAbrev + './' + ano);
+
+      // Atualizar a contagem de filiais que não compraram usando a mesma lógica dos headers
+      // Encontrar o índice correto no array INATIV_DATA.months correspondente ao mês selecionado
+      if(INATIV_DATA && INATIV_DATA.months && INATIV_DATA.months.length) {
+        // Procurar qual índice tem o mês selecionado
+        const monthSearch = mesAbrev + './' + ano; // ex: "Ago./26"
+        let mesIdx = -1;
+        for(let i = 0; i < INATIV_DATA.months.length; i++) {
+          if(INATIV_DATA.months[i] && INATIV_DATA.months[i].toLowerCase().includes(monthSearch.toLowerCase())) {
+            mesIdx = i;
+            break;
+          }
+        }
+        // Se achou o mês, contar; se não achou, usar o último
+        if(mesIdx === -1) mesIdx = INATIV_DATA.months.length - 1;
+        const countNaoComprou = contarNaoComprouGlobal(mesIdx);
+        sv('inativ-total', countNaoComprou.toString());
+      }
     }
   }
 
@@ -2906,20 +2980,10 @@ function renderInativImported(){
   if(!INATIV_DATA || !INATIV_DATA.grupos || !INATIV_DATA.grupos.length) return;
   const m = INATIV_DATA.months;
 
-  // Contar quantos grupos não compraram em cada mês
-  const contarNaoComprou = (mesIdx) => {
-    let count = 0;
-    INATIV_DATA.grupos.forEach(grupo => {
-      if(grupo.vals && grupo.vals[mesIdx] === 'NÃO') {
-        count++;
-      }
-    });
-    return count;
-  };
-
-  const count1 = contarNaoComprou(0);
-  const count2 = contarNaoComprou(1);
-  const count3 = contarNaoComprou(2);
+  // Contar quantos CLIENTES/FILIAIS não compraram em cada mês usando a função global
+  const count1 = contarNaoComprouGlobal(0);
+  const count2 = contarNaoComprouGlobal(1);
+  const count3 = contarNaoComprouGlobal(2);
 
   // Atualizar labels com contagem
   const lbl1=$('lbl-m1'), lbl2=$('lbl-m2'), lbl3=$('lbl-m3');
@@ -3204,11 +3268,32 @@ function applyInativFilter(){
 
   const filtered = getFilteredInativGrupos();
 
-  // KPI: grupos sem venda SÓ no último mês (grupo OU alguma filial)
-  const lastIdx = Math.max(0, INATIV_DATA.months.length - 1);
-  const semVendaCount = INATIV_DATA.grupos.filter(g => gGrupoTemSemVenda(g, lastIdx)).length;
+  // KPI: filiais sem venda no MÊS SELECIONADO (não sempre no último)
+  // Se currentMonth está definido, encontrar seu índice nos meses importados
+  let mesIdx = Math.max(0, INATIV_DATA.months.length - 1); // default: último mês
+
+  if(currentMonth && INATIV_DATA.months && INATIV_DATA.months.length) {
+    const meses = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const parts = currentMonth.split('-');
+    if(parts.length === 2) {
+      const mesNum = parseInt(parts[1]);
+      const ano = parts[0].slice(-2);
+      const mesAbrev = meses[mesNum] || '';
+      const monthSearch = mesAbrev + './' + ano;
+
+      // Procurar qual índice tem este mês
+      for(let i = 0; i < INATIV_DATA.months.length; i++) {
+        if(INATIV_DATA.months[i] && INATIV_DATA.months[i].toLowerCase().includes(monthSearch.toLowerCase())) {
+          mesIdx = i;
+          break;
+        }
+      }
+    }
+  }
+
+  const semVendaCount = contarNaoComprouGlobal(mesIdx);
   sv('inativ-total', semVendaCount.toString());
-  sv('inativ-kpi-mes', 'em ' + (INATIV_DATA.months[lastIdx] || ''));
+  sv('inativ-kpi-mes', 'em ' + (INATIV_DATA.months[mesIdx] || ''));
 
   if(filtered.length === 0){
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:20px">Nenhum grupo neste filtro</td></tr>';
