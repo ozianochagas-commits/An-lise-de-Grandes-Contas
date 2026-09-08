@@ -2584,18 +2584,13 @@ function contarNaoComprouGlobalSemFiltros(mesIdx){
   if(!INATIV_DATA || !INATIV_DATA.grupos) return 0;
 
   INATIV_DATA.grupos.forEach(grupo => {
-    // Se tem filiais, contar APENAS as filiais (não contar grupo)
+    // Contar APENAS as filiais que não compraram
     if(grupo.filiais && grupo.filiais.length > 0) {
       grupo.filiais.forEach(filial => {
         if(filial.vals && filial.vals[mesIdx] === 0) {
           count++;
         }
       });
-    } else {
-      // Se NÃO tem filiais, contar o próprio grupo
-      if(grupo.vals && grupo.vals[mesIdx] === 0) {
-        count++;
-      }
     }
   });
   return count;
