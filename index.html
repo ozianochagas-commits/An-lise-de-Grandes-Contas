@@ -1136,11 +1136,8 @@
           <th style="text-align:left;padding-left:14px;">UF</th>
           <th>Cod. Cliente</th>
           <th>Cliente</th>
-          <th>Faturado R$</th>
-          <th>Carteira R$</th>
-          <th>Devolvido R$</th>
-          <th>Total</th>
-          <th>Objetivo</th>
+          <th>Total R$</th>
+          <th>Objetivo R$</th>
           <th>Falta R$</th>
           <th>Resultado %</th>
         </tr></thead>
@@ -3748,6 +3745,7 @@ async function parsePlanoPlanilha(file){
           if (rowNum === 2) return;
 
           // Linhas 3+: Dados
+          // Estrutura do Excel: UF (0), CodCli (1), Cliente (2), Total Grupo (3), Objetivo (4), Falta (5), Resultado % (6)
           const getCellVal = (colIdx) => {
             const cell = cellMap[colIdx];
             if (!cell) return '';
@@ -3756,85 +3754,61 @@ async function parsePlanoPlanilha(file){
               const idx = parseInt(value);
               return sharedStrings[idx] || '';
             }
-            if (value.startsWith('=')) return '';
+            if (value && value.startsWith('=')) return '';
             return value;
           };
 
           const uf = getCellVal(0).trim();
           const codCli = getCellVal(1).trim();
           const cliente = getCellVal(2).trim();
-          const faturado = parseFloat(getCellVal(3)) || 0;
-          const carteira = parseFloat(getCellVal(4)) || 0;
-          const devolvido = parseFloat(getCellVal(5)) || 0;
-
-          // Calcular total se não tiver valor ou for fórmula
-          let total = parseFloat(getCellVal(7)) || 0;
-          if (!total || getCellVal(7).startsWith('=')) {
-            total = faturado + carteira - devolvido;
-          }
-
-          const objetivo = parseFloat(getCellVal(8)) || 0;
-          let falta = parseFloat(getCellVal(9)) || 0;
-          if (!falta || getCellVal(9).startsWith('=')) {
-            falta = objetivo - total;
-          }
+          const total = parseFloat(getCellVal(3)) || 0;
+          const objetivo = parseFloat(getCellVal(4)) || 0;
+          const falta = objetivo - total;  // Recalcular: FALTA = Objetivo - Total
           const resultadoPct = objetivo > 0 ? (total / objetivo) : 0;
 
           // Se não tem dados, pular
           if (!uf && !cliente) return;
 
-          // Verificar se é um agrupador
-          const isAgrupador = cliente.includes('Agrupador') || cliente.includes('agrupador');
+          // Skip TOTAL rows
+          if (cliente.includes('TOTAL')) return;
+
+          // REGRA: APENAS se tem "- Agrupador" no nome → É um AGRUPADOR
+          const isAgrupador = cliente.includes('- Agrupador');
 
           if (isAgrupador) {
             // Salvar grupo anterior se existir
-            if (currentGrupo && Object.keys(grupoMap).length > 0) {
-              // Pegar primeiro grupo do mapa como referência
-              const grupoKey = Object.keys(grupoMap)[0];
-              const finalGrupo = grupoMap[grupoKey];
-              dados.grupos.push(finalGrupo);
+            if (currentGrupo) {
+              dados.grupos.push(currentGrupo);
             }
 
             // Criar novo agrupador
-            const nomeAgrupador = cliente.replace(/\s*[-–]\s*[Aa]grupador\s*$/, '').trim();
             currentGrupo = {
-              nome: nomeAgrupador,
+              nome: cliente,
               uf: uf,
-              faturado: faturado,
-              carteira: carteira,
-              devolvido: devolvido,
+              codCli: codCli,
               total: total,
               objetivo: objetivo,
               falta: falta,
               resultadoPct: resultadoPct,
               clientes: []
             };
-            grupoMap = {};
-            grupoMap[`${uf}_${nomeAgrupador}`] = currentGrupo;
           } else if (cliente && currentGrupo) {
             // Cliente individual sob um agrupador
-            const grupoKey = Object.keys(grupoMap)[0];
-            if (grupoKey && grupoMap[grupoKey]) {
-              grupoMap[grupoKey].clientes.push({
-                uf: uf,
-                codCli: codCli,
-                cliente: cliente,
-                faturado: faturado,
-                carteira: carteira,
-                devolvido: devolvido,
-                total: total,
-                objetivo: objetivo,
-                falta: falta,
-                resultadoPct: resultadoPct
-              });
-            }
+            currentGrupo.clientes.push({
+              uf: uf,
+              codCli: codCli,
+              cliente: cliente,
+              total: total,
+              objetivo: objetivo,
+              falta: falta,
+              resultadoPct: resultadoPct
+            });
           }
         });
 
         // Adicionar último grupo se existir
-        if (Object.keys(grupoMap).length > 0) {
-          const grupoKey = Object.keys(grupoMap)[0];
-          dados.grupos.push(grupoMap[grupoKey]);
+        if (currentGrupo) {
+          dados.grupos.push(currentGrupo);
         }
 
         resolve(dados);
@@ -3924,13 +3898,23 @@ function refreshPlanoDisplay(){
   applyPlanoFilter();
 }
 
+function formatRepName(rep) {
+  // Converte nome interno para nome completo
+  const names = {
+    'IG': 'IG Representações',
+    'ATIVA': 'ATIVA REPRESENTAÇÕES',
+    'RBR': 'RBR REPRESENTAÇÕES',
+  };
+  return names[rep] || rep;
+}
+
 function onPlanoRepChange(){
   const repSelect = $('plano-rep-select');
   const selectedRep = repSelect.value || '';
 
   if (selectedRep) {
     const el = $('plano-rep-name');
-    if (el) el.textContent = selectedRep;
+    if (el) el.textContent = formatRepName(selectedRep);
   } else {
     const el = $('plano-rep-name');
     if (el) el.textContent = 'Todos os Representantes';
@@ -3976,43 +3960,85 @@ function applyPlanoFilter(){
   renderPlanoTable(filteredData);
 }
 
+function formatMoney(value) {
+  const num = parseFloat(value) || 0;
+  return 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function renderPlanoTable(dados){
   const tbody = $('plano-tbody');
   if (!tbody) return;
 
   tbody.innerHTML = '';
 
+  let grupoIndex = 0;
+  let totalObjetivo = 0;
+  let totalFaturado = 0;
+  let totalFalta = 0;
+
   dados.forEach(plano => {
     // Renderizar agrupadores e clientes
     plano.grupos.forEach(grupo => {
+      grupoIndex++;
+      const currentGrupoIndex = grupoIndex;
+
+      // Acumular totais do agrupador
+      totalObjetivo += grupo.objetivo;
+      totalFaturado += grupo.total;
+      totalFalta += grupo.falta;
+
+      // Acumular totais dos clientes
+      grupo.clientes.forEach(cli => {
+        totalObjetivo += cli.objetivo;
+        totalFaturado += cli.total;
+        totalFalta += cli.falta;
+      });
+
       // Linha do agrupador
       const grupoRow = document.createElement('tr');
       grupoRow.style.background = '#f9f9f9';
       grupoRow.style.fontWeight = 'bold';
+      grupoRow.style.cursor = 'pointer';
+      grupoRow.className = 'grupo-header';
+      grupoRow.setAttribute('data-grupo', currentGrupoIndex);
       grupoRow.innerHTML = `
-        <td style="padding-left:14px;">${grupo.uf}</td>
-        <td>—</td>
+        <td style="padding-left:14px;"><span style="margin-right:8px;">▼</span>${grupo.uf}</td>
+        <td>${grupo.codCli}</td>
         <td>${grupo.nome}</td>
-        <td style="text-align:right;">${formatMoney(grupo.faturado)}</td>
-        <td style="text-align:right;">${formatMoney(grupo.carteira)}</td>
-        <td style="text-align:right;">${formatMoney(grupo.devolvido)}</td>
         <td style="text-align:right;">${formatMoney(grupo.total)}</td>
         <td style="text-align:right;">${formatMoney(grupo.objetivo)}</td>
         <td style="text-align:right;">${formatMoney(grupo.falta)}</td>
         <td style="text-align:right;">${(grupo.resultadoPct * 100).toFixed(1)}%</td>
       `;
+
+      grupoRow.addEventListener('click', function(e) {
+        const isExpanded = this.getAttribute('data-expanded') === 'true';
+        const icon = this.querySelector('span');
+
+        // Toggle estado
+        this.setAttribute('data-expanded', !isExpanded);
+        icon.textContent = isExpanded ? '▶' : '▼';
+
+        // Mostrar/ocultar clientes deste grupo
+        const clientRows = tbody.querySelectorAll(`tr[data-cliente-grupo="${currentGrupoIndex}"]`);
+        clientRows.forEach(row => {
+          row.style.display = isExpanded ? 'none' : 'table-row';
+        });
+      });
+
+      grupoRow.setAttribute('data-expanded', 'false');
+      grupoRow.querySelector('span').textContent = '▶';
       tbody.appendChild(grupoRow);
 
       // Linhas dos clientes
       grupo.clientes.forEach(cli => {
         const cliRow = document.createElement('tr');
+        cliRow.setAttribute('data-cliente-grupo', currentGrupoIndex);
+        cliRow.style.display = 'none';
         cliRow.innerHTML = `
           <td style="padding-left:28px;">${cli.uf}</td>
           <td>${cli.codCli}</td>
           <td>${cli.cliente}</td>
-          <td style="text-align:right;">${formatMoney(cli.faturado)}</td>
-          <td style="text-align:right;">${formatMoney(cli.carteira)}</td>
-          <td style="text-align:right;">${formatMoney(cli.devolvido)}</td>
           <td style="text-align:right;">${formatMoney(cli.total)}</td>
           <td style="text-align:right;">${formatMoney(cli.objetivo)}</td>
           <td style="text-align:right;">${formatMoney(cli.falta)}</td>
@@ -4022,6 +4048,24 @@ function renderPlanoTable(dados){
       });
     });
   });
+
+  // Adicionar linha de TOTAL
+  const resultadoPctTotal = totalObjetivo > 0 ? (totalFaturado / totalObjetivo) : 0;
+  const totalRow = document.createElement('tr');
+  totalRow.style.background = '#ff6b35';
+  totalRow.style.color = 'white';
+  totalRow.style.fontWeight = 'bold';
+  totalRow.style.fontSize = '12px';
+  totalRow.innerHTML = `
+    <td style="padding-left:14px;">—</td>
+    <td>—</td>
+    <td style="text-align:left;">TOTAL GERAL</td>
+    <td style="text-align:right;">${formatMoney(totalFaturado)}</td>
+    <td style="text-align:right;">${formatMoney(totalObjetivo)}</td>
+    <td style="text-align:right;">${formatMoney(totalFalta)}</td>
+    <td style="text-align:right;">${(resultadoPctTotal * 100).toFixed(1)}%</td>
+  `;
+  tbody.appendChild(totalRow);
 }
 
 function exportPlanoPDF(){
