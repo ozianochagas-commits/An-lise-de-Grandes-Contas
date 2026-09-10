@@ -687,6 +687,7 @@
     <option value="previsoes">✏️ Editar Dados</option>
     <option value="trimestre">📅 Trimestre</option>
     <option value="inatividade">🔴 Clientes Inativos</option>
+    <option value="plano">📋 Plano de Negócio</option>
     <option value="agenda">✈️ Agenda de Viagens</option>
   </select>
 </div>
@@ -696,6 +697,7 @@
   <div class="tab" onclick="showTab(this,'previsoes')">✏️ &nbsp;Editar Dados</div>
   <div class="tab" onclick="showTab(this,'trimestre')">📅 &nbsp;Trimestre</div>
   <div class="tab" onclick="showTab(this,'inatividade')">🔴 &nbsp;Clientes Inativos</div>
+  <div class="tab" onclick="showTab(this,'plano')">📋 &nbsp;Plano de Negócio</div>
   <div class="tab" onclick="showTab(this,'agenda')">✈️ &nbsp;Agenda de Viagens</div>
 </div>
 
@@ -1059,6 +1061,90 @@
           <th>Meses Sem Venda</th><th>Principais Famílias (última compra)</th><th>Status</th>
         </tr></thead>
         <tbody id="inativ-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PLANO DE NEGÓCIO ══════════ -->
+<div class="page" id="page-plano">
+  <div class="phero">
+    <div>
+      <h2>📋 Plano de Negócio — Acompanhamento Trimestral</h2>
+      <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(254,80,0,.18);border:1px solid var(--orange2);border-radius:20px;padding:5px 14px;margin:8px 0 6px;">
+        <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.7);text-transform:uppercase;">👤 Representante:</span>
+        <strong id="plano-rep-name" style="font-size:12px;color:var(--orange2);font-weight:900;">Todos os Representantes</strong>
+      </div>
+      <p>Importe a planilha de <strong>Plano de Negócio</strong> (Excel) com os dados trimestrais de faturamento, carteira e rebate. Acompanhe as metas e o desempenho de cada representante.</p>
+    </div>
+  </div>
+
+  <!-- SELETOR DE REPRESENTANTE -->
+  <div id="plano-rep-bar" style="display:none;align-items:center;gap:12px;background:white;border-radius:10px;padding:12px 18px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);flex-wrap:wrap;">
+    <span style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">👤 Ver representante:</span>
+    <select id="plano-rep-select" onchange="onPlanoRepChange()" style="padding:8px 14px;border:2px solid var(--orange);border-radius:7px;font-size:12px;font-weight:700;color:var(--dark);background:#FFF8F5;cursor:pointer;min-width:240px;">
+      <option value="">Todos os Representantes</option>
+    </select>
+    <button class="pdf-btn" onclick="document.getElementById('plano-file-input').click()" style="margin:0;background:var(--dark);font-size:11px;padding:8px 16px;">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 4h5v7h7v9H6V4z"/></svg>
+      Reimportar / Adicionar
+    </button>
+  </div>
+
+  <!-- ÁREA DE IMPORTAÇÃO -->
+  <div id="plano-import-area" style="background:white;border:3px dashed var(--orange);border-radius:12px;padding:36px 24px;text-align:center;margin-bottom:24px;box-shadow:0 2px 10px rgba(0,0,0,.06);">
+    <div style="font-size:48px;margin-bottom:12px;">📥</div>
+    <h3 style="font-size:18px;font-weight:900;color:var(--dark);margin-bottom:8px;">Importar Planilha(s) de Plano de Negócio</h3>
+    <p style="font-size:12px;color:#777;margin-bottom:20px;max-width:540px;margin-left:auto;margin-right:auto;line-height:1.6;">
+      Selecione o(s) arquivo(s) <strong>.xlsx</strong> "Plano de Negócio".<br>
+      <strong>Dica:</strong> selecione <strong>vários arquivos de uma vez</strong> — você escolhe qual representante é cada um.
+    </p>
+    <input type="file" id="plano-file-input" accept=".xlsx" multiple style="display:none;" onchange="importPlanoExcel(event)">
+    <button class="pdf-btn" onclick="document.getElementById('plano-file-input').click()" style="margin:0 auto;display:inline-flex;font-size:13px;padding:12px 28px;">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 4h5v7h7v9H6V4z"/></svg>
+      Escolher Planilha(s)
+    </button>
+    <div id="plano-import-status" style="margin-top:16px;font-size:12px;font-weight:700;"></div>
+  </div>
+
+  <!-- ÁREA DE RESULTADOS (oculta até importar) -->
+  <div id="plano-results" style="display:none;">
+    <div id="plano-import-controls" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:220px;">
+        <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">🔍 Filtro de Trimestre:</label>
+        <select id="plano-trimestre-filter" onchange="applyPlanoFilter()" style="width:100%;margin-top:6px;padding:8px 12px;border:2px solid #E0E0E0;border-radius:7px;font-size:11px;font-weight:600;outline:none;cursor:pointer;">
+          <option value="">Todos os trimestres</option>
+          <option value="1">1º Trimestre</option>
+          <option value="2">2º Trimestre</option>
+          <option value="3">3º Trimestre</option>
+          <option value="4">4º Trimestre</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+        <button class="pdf-btn" onclick="exportPlanoPDF()" style="margin:0;">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 4h5v7h7v9H6V4z"/></svg>
+          Exportar PDF
+        </button>
+        <button class="reset-btn" onclick="clearPlanoImport()" style="height:38px;border-radius:6px">↺ Nova Importação</button>
+      </div>
+    </div>
+
+    <div class="stitle" style="border-radius:8px 8px 0 0;">📋 &nbsp;Dados de Plano de Negócio</div>
+    <div class="twrap" style="overflow-x:auto;">
+      <table>
+        <thead><tr id="plano-thead">
+          <th style="text-align:left;padding-left:14px;">UF</th>
+          <th>Cod. Cliente</th>
+          <th>Cliente</th>
+          <th>Faturado R$</th>
+          <th>Carteira R$</th>
+          <th>Devolvido R$</th>
+          <th>Total</th>
+          <th>Objetivo</th>
+          <th>Falta R$</th>
+          <th>Resultado %</th>
+        </tr></thead>
+        <tbody id="plano-tbody"></tbody>
       </table>
     </div>
   </div>
@@ -3507,6 +3593,446 @@ function clearInativImport(){
   refreshInativForRep();
 }
 
+// ══════════ PLANO DE NEGÓCIO ══════════
+
+// Estrutura de dados para armazenar Plano de Negócio por representante
+let PLANO_BY_REP = {};
+
+function savePlanoByRep(){
+  localStorage.setItem('PLANO_BY_REP', JSON.stringify(PLANO_BY_REP));
+}
+
+function loadPlanoByRep(){
+  const saved = localStorage.getItem('PLANO_BY_REP');
+  PLANO_BY_REP = saved ? JSON.parse(saved) : {};
+}
+
+// Parser melhorado para Excel Plano de Negócio
+async function parsePlanoPlanilha(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        // Usar JSZip para ler o arquivo
+        const zip = await JSZip.loadAsync(e.target.result);
+
+        // Ler shared strings
+        const sharedStringsXml = await zip.file('xl/sharedStrings.xml').async('string');
+        const parser = new DOMParser();
+        const sXmlDoc = parser.parseFromString(sharedStringsXml, 'application/xml');
+        const sharedStrings = [];
+
+        // Usar namespace-aware query
+        sXmlDoc.querySelectorAll('[tagName="si"]').forEach(si => {
+          const t = si.querySelector('[tagName="t"]');
+          sharedStrings.push(t ? t.textContent : '');
+        });
+        // Fallback sem namespace
+        if (sharedStrings.length === 0) {
+          sXmlDoc.querySelectorAll('si').forEach(si => {
+            const t = si.querySelector('t');
+            sharedStrings.push(t ? t.textContent : '');
+          });
+        }
+
+        // Ler worksheet
+        const xmlStr = await zip.file('xl/worksheets/sheet1.xml').async('string');
+        const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
+
+        // Procurar por row elements com namespace awareness
+        let rows = xmlDoc.querySelectorAll('[tagName="row"]');
+        if (rows.length === 0) {
+          rows = xmlDoc.querySelectorAll('row');
+        }
+        if (rows.length === 0) {
+          // Tenta usando getElementsByTagName que funciona melhor com namespaces
+          rows = xmlDoc.getElementsByTagName('row');
+        }
+
+        let representante = '';
+        let trimestre = '';
+        let dados = {
+          trimestre: '',
+          representante: '',
+          grupos: []
+        };
+
+        let currentGrupo = null;
+        let grupoMap = {}; // Map de UF + nome -> grupo
+
+        const getCellValue = (cells, colIdx) => {
+          if (!cells || colIdx >= cells.length) return '';
+          const cell = cells[colIdx];
+          if (!cell) return '';
+
+          const t = cell.getAttribute('t') || 'n';
+
+          // Procurar por elemento 'v' (value)
+          let v = cell.querySelector('v');
+          if (!v) {
+            // Tenta getElementsByTagName como fallback
+            const vElements = cell.getElementsByTagName('v');
+            v = vElements.length > 0 ? vElements[0] : null;
+          }
+
+          const value = v ? v.textContent : '';
+
+          if (!value) return '';
+
+          if (t === 's') {
+            const idx = parseInt(value);
+            return sharedStrings[idx] || '';
+          }
+
+          // Limpar fórmulas
+          if (value.startsWith('=')) return '';
+          return value;
+        };
+
+        // Função para extrair coluna do atributo 'r' (ex: "A1" -> 0, "B1" -> 1)
+        const getColIndex = (cellRef) => {
+          const match = cellRef.match(/^([A-Z]+)/);
+          if (!match) return -1;
+          let col = 0;
+          for (let char of match[1]) {
+            col = col * 26 + (char.charCodeAt(0) - 64);
+          }
+          return col - 1;
+        };
+
+        // Processar linhas
+        let lineCount = 0;
+        Array.from(rows).forEach((row, rowIdx) => {
+          let cellsArray = row.querySelectorAll('c');
+          if (cellsArray.length === 0) {
+            cellsArray = row.getElementsByTagName('c');
+          }
+
+          lineCount++;
+          const rowNum = parseInt(row.getAttribute('r') || rowIdx + 1);
+
+          // Criar mapa de coluna -> valor
+          const cellMap = {};
+          Array.from(cellsArray).forEach(cell => {
+            const cellRef = cell.getAttribute('r');
+            const colIdx = getColIndex(cellRef);
+            if (colIdx >= 0) {
+              const t = cell.getAttribute('t') || 'n';
+              let v = cell.querySelector('v');
+              if (!v) {
+                const vElements = cell.getElementsByTagName('v');
+                v = vElements.length > 0 ? vElements[0] : null;
+              }
+              const value = v ? v.textContent : '';
+              cellMap[colIdx] = { value: value, type: t };
+            }
+          });
+
+          // Linha 1: Cabeçalho com representante e trimestre
+          if (rowNum === 1) {
+            const headerVal = cellMap[0];
+            if (headerVal) {
+              const headerText = headerVal.type === 's' ? (sharedStrings[parseInt(headerVal.value)] || '') : headerVal.value;
+              const match = headerText.match(/\((\d+)\)\s+([^-]+)\s*-\s*(\d+)º/i);
+              if (match) {
+                representante = match[2].trim().toUpperCase();
+                trimestre = match[3];
+              }
+              dados.representante = representante;
+              dados.trimestre = trimestre;
+            }
+            return;
+          }
+
+          // Linha 2: Cabeçalho de colunas (pular)
+          if (rowNum === 2) return;
+
+          // Linhas 3+: Dados
+          const getCellVal = (colIdx) => {
+            const cell = cellMap[colIdx];
+            if (!cell) return '';
+            const { value, type } = cell;
+            if (type === 's') {
+              const idx = parseInt(value);
+              return sharedStrings[idx] || '';
+            }
+            if (value.startsWith('=')) return '';
+            return value;
+          };
+
+          const uf = getCellVal(0).trim();
+          const codCli = getCellVal(1).trim();
+          const cliente = getCellVal(2).trim();
+          const faturado = parseFloat(getCellVal(3)) || 0;
+          const carteira = parseFloat(getCellVal(4)) || 0;
+          const devolvido = parseFloat(getCellVal(5)) || 0;
+          const total = parseFloat(getCellVal(7)) || 0;
+          const objetivo = parseFloat(getCellVal(8)) || 0;
+          const falta = parseFloat(getCellVal(9)) || 0;
+          const resultadoPct = objetivo > 0 ? (total / objetivo) : 0;
+
+          // Se não tem dados, pular
+          if (!uf && !cliente) return;
+
+          // Verificar se é um agrupador
+          const isAgrupador = cliente.includes('Agrupador') || cliente.includes('agrupador');
+
+          if (isAgrupador) {
+            // Salvar grupo anterior se existir
+            if (currentGrupo && Object.keys(grupoMap).length > 0) {
+              // Pegar primeiro grupo do mapa como referência
+              const grupoKey = Object.keys(grupoMap)[0];
+              const finalGrupo = grupoMap[grupoKey];
+              dados.grupos.push(finalGrupo);
+            }
+
+            // Criar novo agrupador
+            const nomeAgrupador = cliente.replace(/\s*[-–]\s*[Aa]grupador\s*$/, '').trim();
+            currentGrupo = {
+              nome: nomeAgrupador,
+              uf: uf,
+              faturado: faturado,
+              carteira: carteira,
+              devolvido: devolvido,
+              total: total,
+              objetivo: objetivo,
+              falta: falta,
+              resultadoPct: resultadoPct,
+              clientes: []
+            };
+            grupoMap = {};
+            grupoMap[`${uf}_${nomeAgrupador}`] = currentGrupo;
+          } else if (cliente && currentGrupo) {
+            // Cliente individual sob um agrupador
+            const grupoKey = Object.keys(grupoMap)[0];
+            if (grupoKey && grupoMap[grupoKey]) {
+              grupoMap[grupoKey].clientes.push({
+                uf: uf,
+                codCli: codCli,
+                cliente: cliente,
+                faturado: faturado,
+                carteira: carteira,
+                devolvido: devolvido,
+                total: total,
+                objetivo: objetivo,
+                falta: falta,
+                resultadoPct: resultadoPct
+              });
+            }
+          }
+        });
+
+        // Adicionar último grupo se existir
+        if (Object.keys(grupoMap).length > 0) {
+          const grupoKey = Object.keys(grupoMap)[0];
+          dados.grupos.push(grupoMap[grupoKey]);
+        }
+
+        resolve(dados);
+      } catch (err) {
+        console.error('Erro ao parsear Plano:', err);
+        reject(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function importPlanoExcel(event){
+  const files = event.target.files;
+  if (!files.length) return;
+
+  $('plano-import-status').textContent = '📥 Processando arquivos...';
+
+  try {
+    const fileList = Array.from(files);
+    let successCount = 0;
+
+    for (let file of fileList) {
+      try {
+        const dadosPlano = await parsePlanoPlanilha(file);
+
+        if (!dadosPlano.representante) {
+          dadosPlano.representante = prompt(`Qual é o representante para "${file.name}"?`) || 'SEM REP';
+        }
+
+        if (!dadosPlano.trimestre) {
+          dadosPlano.trimestre = prompt(`Qual trimestre para "${file.name}"? (1-4)`) || '3';
+        }
+
+        if (!PLANO_BY_REP[dadosPlano.representante]) {
+          PLANO_BY_REP[dadosPlano.representante] = [];
+        }
+
+        // Verificar se já existe este trimestre e remover
+        PLANO_BY_REP[dadosPlano.representante] =
+          PLANO_BY_REP[dadosPlano.representante].filter(p => p.trimestre !== dadosPlano.trimestre);
+
+        PLANO_BY_REP[dadosPlano.representante].push(dadosPlano);
+        successCount++;
+      } catch (err) {
+        console.error(`Erro ao processar ${file.name}:`, err);
+      }
+    }
+
+    savePlanoByRep();
+
+    if (successCount > 0) {
+      $('plano-import-status').innerHTML = `✅ ${successCount} arquivo(s) importado(s) com sucesso!`;
+      refreshPlanoDisplay();
+
+      setTimeout(() => {
+        $('plano-import-area').style.display = 'none';
+        $('plano-results').style.display = 'block';
+        $('plano-rep-bar').style.display = 'flex';
+      }, 500);
+    } else {
+      $('plano-import-status').textContent = '❌ Nenhum arquivo foi processado corretamente.';
+    }
+
+  } catch (err) {
+    console.error('Erro geral ao importar:', err);
+    $('plano-import-status').textContent = '❌ Erro ao importar: ' + err.message;
+  }
+
+  event.target.value = '';
+}
+
+function refreshPlanoDisplay(){
+  // Atualizar lista de representantes no seletor
+  const repSelect = $('plano-rep-select');
+  if (!repSelect) return;
+
+  const reps = Object.keys(PLANO_BY_REP).sort();
+  repSelect.innerHTML = '<option value="">Todos os Representantes</option>';
+  reps.forEach(rep => {
+    const opt = document.createElement('option');
+    opt.value = rep;
+    opt.textContent = rep;
+    repSelect.appendChild(opt);
+  });
+
+  applyPlanoFilter();
+}
+
+function onPlanoRepChange(){
+  const repSelect = $('plano-rep-select');
+  const selectedRep = repSelect.value || '';
+
+  if (selectedRep) {
+    const el = $('plano-rep-name');
+    if (el) el.textContent = selectedRep;
+  } else {
+    const el = $('plano-rep-name');
+    if (el) el.textContent = 'Todos os Representantes';
+  }
+
+  applyPlanoFilter();
+}
+
+function applyPlanoFilter(){
+  const repSelect = $('plano-rep-select');
+  const trimestreFilter = $('plano-trimestre-filter');
+  const selectedRep = repSelect ? repSelect.value : '';
+  const selectedTrimestre = trimestreFilter ? trimestreFilter.value : '';
+
+  let filteredData = [];
+
+  if (!selectedRep) {
+    // Mostrar tudo
+    Object.keys(PLANO_BY_REP).forEach(rep => {
+      PLANO_BY_REP[rep].forEach(plano => {
+        if (!selectedTrimestre || plano.trimestre === selectedTrimestre) {
+          filteredData.push({
+            representante: rep,
+            ...plano
+          });
+        }
+      });
+    });
+  } else {
+    // Mostrar só o representante selecionado
+    if (PLANO_BY_REP[selectedRep]) {
+      PLANO_BY_REP[selectedRep].forEach(plano => {
+        if (!selectedTrimestre || plano.trimestre === selectedTrimestre) {
+          filteredData.push({
+            representante: selectedRep,
+            ...plano
+          });
+        }
+      });
+    }
+  }
+
+  renderPlanoTable(filteredData);
+}
+
+function renderPlanoTable(dados){
+  const tbody = $('plano-tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+
+  dados.forEach(plano => {
+    // Renderizar agrupadores e clientes
+    plano.grupos.forEach(grupo => {
+      // Linha do agrupador
+      const grupoRow = document.createElement('tr');
+      grupoRow.style.background = '#f9f9f9';
+      grupoRow.style.fontWeight = 'bold';
+      grupoRow.innerHTML = `
+        <td style="padding-left:14px;">${grupo.uf}</td>
+        <td>—</td>
+        <td>${grupo.nome}</td>
+        <td style="text-align:right;">${formatMoney(grupo.faturado)}</td>
+        <td style="text-align:right;">${formatMoney(grupo.carteira)}</td>
+        <td style="text-align:right;">${formatMoney(grupo.devolvido)}</td>
+        <td style="text-align:right;">${formatMoney(grupo.total)}</td>
+        <td style="text-align:right;">${formatMoney(grupo.objetivo)}</td>
+        <td style="text-align:right;">${formatMoney(grupo.falta)}</td>
+        <td style="text-align:right;">${(grupo.resultadoPct * 100).toFixed(1)}%</td>
+      `;
+      tbody.appendChild(grupoRow);
+
+      // Linhas dos clientes
+      grupo.clientes.forEach(cli => {
+        const cliRow = document.createElement('tr');
+        cliRow.innerHTML = `
+          <td style="padding-left:28px;">${cli.uf}</td>
+          <td>${cli.codCli}</td>
+          <td>${cli.cliente}</td>
+          <td style="text-align:right;">${formatMoney(cli.faturado)}</td>
+          <td style="text-align:right;">${formatMoney(cli.carteira)}</td>
+          <td style="text-align:right;">${formatMoney(cli.devolvido)}</td>
+          <td style="text-align:right;">${formatMoney(cli.total)}</td>
+          <td style="text-align:right;">${formatMoney(cli.objetivo)}</td>
+          <td style="text-align:right;">${formatMoney(cli.falta)}</td>
+          <td style="text-align:right;">${(cli.resultadoPct * 100).toFixed(1)}%</td>
+        `;
+        tbody.appendChild(cliRow);
+      });
+    });
+  });
+}
+
+function exportPlanoPDF(){
+  alert('📥 Exportação em PDF será implementada em breve.');
+}
+
+function clearPlanoImport(){
+  PLANO_BY_REP = {};
+  savePlanoByRep();
+  $('plano-file-input').value = '';
+  const repSelect = $('plano-rep-select');
+  if (repSelect) repSelect.value = '';
+  $('plano-import-status').textContent = '';
+  $('plano-import-area').style.display = 'block';
+  $('plano-results').style.display = 'none';
+  $('plano-rep-bar').style.display = 'none';
+  const repName = $('plano-rep-name');
+  if (repName) repName.textContent = 'Todos os Representantes';
+}
+
 // ══════════ COMPARTILHAR VIA LINK ══════════
 // Enxuga os dados do compartilhamento p/ o link ficar o menor possível:
 //   • mantém só as 3 maiores famílias por filial (as principais)
@@ -4051,6 +4577,7 @@ async function initDashboard() {
   setAutoDate();
   loadClientsData();    // carrega dados salvos de clientes da previsão
   if(!shared) loadInativByRep();  // carrega análise de grandes contas por representante
+  if(!shared) loadPlanoByRep();   // carrega plano de negócio por representante
   buildFilter();        // cria os checkboxes do dropdown
   // Abre SEMPRE no trimestre vigente (a edição salva nesse trimestre)
   if(!shared){ currentTrimestre = getVigenteTrimestre(); }
