@@ -3766,9 +3766,18 @@ async function parsePlanoPlanilha(file){
           const faturado = parseFloat(getCellVal(3)) || 0;
           const carteira = parseFloat(getCellVal(4)) || 0;
           const devolvido = parseFloat(getCellVal(5)) || 0;
-          const total = parseFloat(getCellVal(7)) || 0;
+
+          // Calcular total se não tiver valor ou for fórmula
+          let total = parseFloat(getCellVal(7)) || 0;
+          if (!total || getCellVal(7).startsWith('=')) {
+            total = faturado + carteira - devolvido;
+          }
+
           const objetivo = parseFloat(getCellVal(8)) || 0;
-          const falta = parseFloat(getCellVal(9)) || 0;
+          let falta = parseFloat(getCellVal(9)) || 0;
+          if (!falta || getCellVal(9).startsWith('=')) {
+            falta = objetivo - total;
+          }
           const resultadoPct = objetivo > 0 ? (total / objetivo) : 0;
 
           // Se não tem dados, pular
