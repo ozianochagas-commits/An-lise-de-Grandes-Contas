@@ -3652,6 +3652,200 @@ function clearInativImport(){
 let PLANO_BY_REP = {};
 const PLANO_TABLE = 'plano_negocio';
 
+// ── ACÚMULO DE IMPORTAÇÕES DO PLANO ────────────────────────────────────────
+// Cada novo Excel deve SOMAR ao que já foi importado para o mesmo
+// representante + tipo de período + número do período. Não substitui.
+function planoNum(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizePlanoText(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toUpperCase();
+}
+
+function normalizePlanoRep(rep) {
+  let nome = normalizePlanoText(rep)
+    .replace(/^\(\d+\)\s*/, '')
+    .replace(/\s+-\s+\d+\s*[º°]?\s*(TRIMESTRE|SEMESTRE).*$/i, '')
+    .replace(/\s+PLANOS(?:\s*-.*)?$/i, '')
+    .replace(/\s+REPRESENTACOES?$/i, '')
+    .trim();
+
+  // Canoniza os representantes conhecidos para evitar chaves diferentes
+  // entre os vários modelos de planilha.
+  if (/^ATIVA\b/.test(nome)) return 'ATIVA';
+  if (/^RBR\b/.test(nome)) return 'RBR';
+  if (/^IG\b/.test(nome)) return 'IG';
+  return nome;
+}
+
+function planoClientKey(cli) {
+  const cod = String(cli?.codCli ?? '').trim();
+  if (cod) return `COD:${cod}`;
+  return `CLI:${normalizePlanoText(cli?.cliente)}|UF:${normalizePlanoText(cli?.uf)}`;
+}
+
+function planoGroupKey(grupo) {
+  const cod = String(grupo?.codCli ?? '').trim();
+  if (cod) return `COD:${cod}`;
+  return `GRP:${normalizePlanoText(grupo?.nome)}|UF:${normalizePlanoText(grupo?.uf)}`;
+}
+
+function mergePlanoClientes(existentes = [], novos = []) {
+  const map = new Map();
+
+  for (const cli of (existentes || [])) {
+    map.set(planoClientKey(cli), {
+      ...cli,
+      total: planoNum(cli.total),
+      objetivo: planoNum(cli.objetivo),
+      falta: planoNum(cli.falta),
+      resultadoPct: planoNum(cli.resultadoPct)
+    });
+  }
+
+  for (const cli of (novos || [])) {
+    const key = planoClientKey(cli);
+    const atual = map.get(key);
+
+    if (!atual) {
+      const total = planoNum(cli.total);
+      const objetivo = planoNum(cli.objetivo);
+      map.set(key, {
+        ...cli,
+        total,
+        objetivo,
+        falta: objetivo - total,
+        resultadoPct: objetivo > 0 ? total / objetivo : 0
+      });
+      continue;
+    }
+
+    atual.total = planoNum(atual.total) + planoNum(cli.total);
+    atual.objetivo = planoNum(atual.objetivo) + planoNum(cli.objetivo);
+    atual.falta = atual.objetivo - atual.total;
+    atual.resultadoPct = atual.objetivo > 0 ? atual.total / atual.objetivo : 0;
+
+    // Mantém os dados textuais mais completos quando a primeira origem vier vazia.
+    atual.cliente = atual.cliente || cli.cliente;
+    atual.uf = atual.uf || cli.uf;
+    atual.codCli = atual.codCli || cli.codCli;
+    atual.periodo = atual.periodo || cli.periodo;
+  }
+
+  return Array.from(map.values());
+}
+
+function mergePlanoGrupos(existentes = [], novos = []) {
+  const map = new Map();
+
+  for (const grupo of (existentes || [])) {
+    map.set(planoGroupKey(grupo), {
+      ...grupo,
+      total: planoNum(grupo.total),
+      objetivo: planoNum(grupo.objetivo),
+      falta: planoNum(grupo.falta),
+      resultadoPct: planoNum(grupo.resultadoPct),
+      clientes: (grupo.clientes || []).map(cli => ({ ...cli }))
+    });
+  }
+
+  for (const grupo of (novos || [])) {
+    const key = planoGroupKey(grupo);
+    const atual = map.get(key);
+
+    if (!atual) {
+      const total = planoNum(grupo.total);
+      const objetivo = planoNum(grupo.objetivo);
+      map.set(key, {
+        ...grupo,
+        total,
+        objetivo,
+        falta: objetivo - total,
+        resultadoPct: objetivo > 0 ? total / objetivo : 0,
+        clientes: (grupo.clientes || []).map(cli => ({ ...cli }))
+      });
+      continue;
+    }
+
+    // O total/objetivo do grupo já é consolidado pelo parser. Portanto soma-se
+    // grupo com grupo; os clientes são unidos apenas para detalhamento.
+    atual.total = planoNum(atual.total) + planoNum(grupo.total);
+    atual.objetivo = planoNum(atual.objetivo) + planoNum(grupo.objetivo);
+    atual.falta = atual.objetivo - atual.total;
+    atual.resultadoPct = atual.objetivo > 0 ? atual.total / atual.objetivo : 0;
+    atual.clientes = mergePlanoClientes(atual.clientes || [], grupo.clientes || []);
+
+    atual.nome = atual.nome || grupo.nome;
+    atual.uf = atual.uf || grupo.uf;
+    atual.codCli = atual.codCli || grupo.codCli;
+    atual.periodo = atual.periodo || grupo.periodo;
+  }
+
+  return Array.from(map.values());
+}
+
+function acumularPlanoImportado(dadosPlano) {
+  const rep = normalizePlanoRep(dadosPlano.representante);
+  const periodo = String(dadosPlano.periodo || 'TRIMESTRAL').toUpperCase();
+  const periodoNum = String(dadosPlano.periodoNum || '');
+
+  dadosPlano.representante = rep;
+  dadosPlano.periodo = periodo;
+  dadosPlano.periodoNum = periodoNum;
+  dadosPlano.trimestre = periodo === 'TRIMESTRAL' ? periodoNum : '';
+
+  if (!PLANO_BY_REP[rep]) PLANO_BY_REP[rep] = [];
+
+  const idx = PLANO_BY_REP[rep].findIndex(p =>
+    String(p.periodo || '').toUpperCase() === periodo &&
+    String(p.periodoNum || '') === periodoNum
+  );
+
+  if (idx < 0) {
+    PLANO_BY_REP[rep].push({
+      ...dadosPlano,
+      grupos: (dadosPlano.grupos || []).map(g => ({
+        ...g,
+        clientes: (g.clientes || []).map(c => ({ ...c }))
+      }))
+    });
+    return { acumulado: false, representante: rep, periodo, periodoNum };
+  }
+
+  const existente = PLANO_BY_REP[rep][idx];
+  existente.representante = rep;
+  existente.periodo = periodo;
+  existente.periodoNum = periodoNum;
+  existente.trimestre = periodo === 'TRIMESTRAL' ? periodoNum : '';
+  existente.grupos = mergePlanoGrupos(existente.grupos || [], dadosPlano.grupos || []);
+
+  return { acumulado: true, representante: rep, periodo, periodoNum };
+}
+
+// Migra em memória nomes antigos (ex.: "ATIVA REPRESENTAÇÕES") para a mesma
+// chave canônica, acumulando os dados em vez de criar representantes duplicados.
+function normalizarPlanoByRepAtual() {
+  const antigo = PLANO_BY_REP || {};
+  PLANO_BY_REP = {};
+
+  Object.entries(antigo).forEach(([rep, planos]) => {
+    (planos || []).forEach(plano => {
+      acumularPlanoImportado({
+        ...plano,
+        representante: rep,
+        grupos: plano.grupos || []
+      });
+    });
+  });
+}
+
 async function savePlanoByRep(options = {}) {
   // O Plano de Negócio é independente da Agenda.
   // Salva sempre no navegador primeiro para não perder uma importação válida.
@@ -4748,6 +4942,10 @@ async function importPlanoExcel(event){
   $('plano-import-status').textContent = '📥 Processando arquivos...';
 
   try {
+    // Garante que dados já existentes de modelos antigos usem a mesma chave
+    // de representante antes de começar a somar os novos arquivos.
+    normalizarPlanoByRepAtual();
+
     const fileList = Array.from(files);
     let successCount = 0;
 
@@ -4805,20 +5003,15 @@ async function importPlanoExcel(event){
           console.log(`  - Representante: "${dadosPlano.representante}"`);
           console.log(`  - É número? ${isNaN(dadosPlano.representante)}`);
 
-          if (!PLANO_BY_REP[dadosPlano.representante]) {
-            PLANO_BY_REP[dadosPlano.representante] = [];
-          }
-
-          // Verificar se já existe este período e remover
-          PLANO_BY_REP[dadosPlano.representante] =
-            PLANO_BY_REP[dadosPlano.representante].filter(p =>
-              !(p.periodoNum === dadosPlano.periodoNum && p.periodo === dadosPlano.periodo)
-            );
-
-          PLANO_BY_REP[dadosPlano.representante].push(dadosPlano);
+          // IMPORTANTE: o novo Excel SOMA ao período já existente.
+          // Não removemos mais o período anterior.
+          const resultadoAcumulo = acumularPlanoImportado(dadosPlano);
           successCount++;
 
-          console.log(`✅ Importado: ${dadosPlano.representante} - ${dadosPlano.periodo} ${dadosPlano.periodoNum}`);
+          console.log(
+            `${resultadoAcumulo.acumulado ? '➕ Somado' : '✅ Importado'}: ` +
+            `${resultadoAcumulo.representante} - ${resultadoAcumulo.periodo} ${resultadoAcumulo.periodoNum}`
+          );
         }
       } catch (err) {
         console.error(`❌ Erro ao importar ${file.name}:`, err);
@@ -4849,9 +5042,9 @@ async function importPlanoExcel(event){
     $('plano-results').style.display = 'block';
     $('plano-rep-bar').style.display = 'flex';
     if (planoSync && planoSync.cloud) {
-      $('plano-import-status').textContent = `✓ ${successCount} período(s) importado(s) e sincronizado(s) com o Supabase!`;
+      $('plano-import-status').textContent = `✓ ${successCount} seção(ões) processada(s) e SOMADA(S) ao Plano. Supabase sincronizado!`;
     } else {
-      $('plano-import-status').textContent = `✓ ${successCount} período(s) importado(s) com sucesso. ⚠️ Sincronização com Supabase pendente${planoSync?.motivo ? ': ' + planoSync.motivo : ''}.`;
+      $('plano-import-status').textContent = `✓ ${successCount} seção(ões) processada(s) e SOMADA(S) ao Plano. ⚠️ Sincronização com Supabase pendente${planoSync?.motivo ? ': ' + planoSync.motivo : ''}.`;
     }
 
     applyPlanoFilter();
@@ -4992,8 +5185,9 @@ function renderPlanoTable(dados){
 
   dados.forEach(plano => {
     (plano.grupos || []).forEach(grupo => {
-      const periodoKey = grupo.periodo; // Ex: TRIMESTRAL ou SEMESTRAL
-      const codCliKey = grupo.codCli;
+      const periodoKey = grupo.periodo || plano.periodo || 'TRIMESTRAL'; // Ex: TRIMESTRAL ou SEMESTRAL
+      const codCliRaw = String(grupo.codCli ?? '').trim();
+      const codCliKey = codCliRaw || `NOME:${normalizePlanoText(grupo.nome)}|UF:${normalizePlanoText(grupo.uf)}`;
 
       if (!periodoMap[periodoKey]) {
         periodoMap[periodoKey] = {};
@@ -5192,28 +5386,17 @@ function exportPlanoPDF(){
   alert('📥 Exportação em PDF será implementada em breve.');
 }
 
-async function clearPlanoImport(){
-  const confirmou = confirm('Deseja apagar TODOS os Planos de Negócio salvos, inclusive do Supabase?');
+function clearPlanoImport(){
+  const confirmou = confirm('Deseja limpar os Planos de Negócio armazenados neste navegador? Os dados do Supabase não serão apagados.');
   if (!confirmou) return;
 
   PLANO_BY_REP = {};
   localStorage.removeItem('PLANO_BY_REP');
 
-  initSupabase();
-  if (window.supabaseClient) {
-    try {
-      // representante é obrigatório; esta condição alcança todas as linhas válidas.
-      const { error } = await window.supabaseClient
-        .from(PLANO_TABLE)
-        .delete()
-        .neq('representante', '');
-      if (error) throw error;
-      console.log('✅ Planos removidos do Supabase');
-    } catch (err) {
-      console.error('❌ Não foi possível limpar Planos no Supabase:', err);
-      alert('Os dados locais foram limpos, mas não foi possível apagar o Supabase. Verifique as políticas/RLS da tabela plano_negocio.');
-    }
-  }
+  // IMPORTANTE: não fazemos DELETE no Supabase pelo navegador.
+  // A aplicação usa a chave pública (anon) e a tabela possui RLS.
+  // A exclusão remota deve ser feita por uma rota/usuário autenticado ou diretamente no Supabase.
+  console.log('🧹 Plano de Negócio local limpo. Supabase preservado.');
 
   $('plano-file-input').value = '';
   const repSelect = $('plano-rep-select');
