@@ -3641,24 +3641,155 @@ function clearInativImport(){
 
 // Estrutura de dados para armazenar Plano de Negócio por representante
 let PLANO_BY_REP = {};
+const PLANO_TABLE = 'plano_negocio';
 
-function savePlanoByRep(){
+async function savePlanoByRep() {
+  // Cache local continua existindo como segurança
   localStorage.setItem('PLANO_BY_REP', JSON.stringify(PLANO_BY_REP));
-}
 
-function loadPlanoByRep(){
-  const saved = localStorage.getItem('PLANO_BY_REP');
-  const data = saved ? JSON.parse(saved) : {};
+  initSupabase();
 
-  // Filtrar representantes inválidos (números simples, strings vazias)
-  const filtered = {};
-  Object.keys(data).forEach(rep => {
-    if (rep && rep.trim() && isNaN(rep)) {
-      filtered[rep] = data[rep];
-    }
+  if (!window.supabaseClient) {
+    throw new Error('Supabase não inicializado.');
+  }
+
+  const rows = [];
+
+  Object.entries(PLANO_BY_REP).forEach(([representante, planos]) => {
+    (planos || []).forEach(plano => {
+      rows.push({
+        representante: representante,
+        periodo: plano.periodo,
+        periodo_num: String(plano.periodoNum ?? ''),
+        trimestre: String(plano.trimestre ?? plano.periodoNum ?? ''),
+        grupos: plano.grupos || [],
+        updated_at: new Date().toISOString()
+      });
+    });
   });
 
-  PLANO_BY_REP = filtered;
+  if (!rows.length) return true;
+
+  const { error } = await window.supabaseClient
+    .from(PLANO_TABLE)
+    .upsert(rows, {
+      onConflict: 'representante,periodo,periodo_num'
+    });
+
+  if (error) {
+    console.error('❌ Erro ao salvar Plano no Supabase:', error);
+    throw error;
+  }
+
+  console.log(`✅ ${rows.length} período(s) salvos no Supabase`);
+  return true;
+}
+
+
+async function loadPlanoByRep() {
+  initSupabase();
+
+  // 1. Tenta carregar do Supabase
+  if (window.supabaseClient) {
+    try {
+      const { data, error } = await window.supabaseClient
+        .from(PLANO_TABLE)
+        .select('representante,periodo,periodo_num,trimestre,grupos');
+
+      if (error) throw error;
+
+      if (data && data.length) {
+        const resultado = {};
+
+        data.forEach(row => {
+          const rep = row.representante;
+
+          if (!rep || !rep.trim() || !isNaN(rep)) return;
+
+          if (!resultado[rep]) {
+            resultado[rep] = [];
+          }
+
+          resultado[rep].push({
+            representante: rep,
+            periodo: row.periodo,
+            periodoNum: String(row.periodo_num),
+            trimestre: String(row.trimestre ?? row.periodo_num),
+            grupos: row.grupos || []
+          });
+        });
+
+        PLANO_BY_REP = resultado;
+
+        // Atualiza cache local
+        localStorage.setItem(
+          'PLANO_BY_REP',
+          JSON.stringify(PLANO_BY_REP)
+        );
+
+        mostrarPlanoCarregado();
+
+        console.log('✅ Plano de Negócio carregado do Supabase');
+        return true;
+      }
+
+    } catch (error) {
+      console.warn(
+        '⚠️ Falha ao carregar Plano do Supabase. Usando cache local.',
+        error
+      );
+    }
+  }
+
+  // 2. Fallback para localStorage
+  try {
+    const saved = localStorage.getItem('PLANO_BY_REP');
+    const data = saved ? JSON.parse(saved) : {};
+
+    const filtered = {};
+
+    Object.keys(data).forEach(rep => {
+      if (rep && rep.trim() && isNaN(rep)) {
+        filtered[rep] = data[rep];
+      }
+    });
+
+    PLANO_BY_REP = filtered;
+
+    mostrarPlanoCarregado();
+
+    return Object.keys(filtered).length > 0;
+
+  } catch (error) {
+    console.error('Erro ao carregar Plano local:', error);
+    PLANO_BY_REP = {};
+    return false;
+  }
+}
+
+
+function mostrarPlanoCarregado() {
+  const temDados = Object.keys(PLANO_BY_REP).length > 0;
+
+  const importArea = $('plano-import-area');
+  const results = $('plano-results');
+  const repBar = $('plano-rep-bar');
+
+  if (importArea) {
+    importArea.style.display = temDados ? 'none' : 'block';
+  }
+
+  if (results) {
+    results.style.display = temDados ? 'block' : 'none';
+  }
+
+  if (repBar) {
+    repBar.style.display = temDados ? 'flex' : 'none';
+  }
+
+  if (temDados) {
+    refreshPlanoDisplay();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -4582,7 +4713,7 @@ async function importPlanoExcel(event){
       }
     }
 
-    savePlanoByRep();
+    await savePlanoByRep();
 
     // Atualizar interface
     const repSelect = $('plano-rep-select');
@@ -5512,7 +5643,7 @@ async function initDashboard() {
   setAutoDate();
   loadClientsData();    // carrega dados salvos de clientes da previsão
   if(!shared) loadInativByRep();  // carrega análise de grandes contas por representante
-  if(!shared) loadPlanoByRep();   // carrega plano de negócio por representante
+  if(!shared) await loadPlanoByRep();   // carrega plano de negócio por representante
   buildFilter();        // cria os checkboxes do dropdown
   // Abre SEMPRE no trimestre vigente (a edição salva nesse trimestre)
   if(!shared){ currentTrimestre = getVigenteTrimestre(); }
