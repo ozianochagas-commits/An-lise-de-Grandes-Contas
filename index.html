@@ -3822,6 +3822,7 @@ async function parsePlanoPlanilha(file){
         const secoes = []; // Array de seções encontradas
         let secaoAtual = null;
         let representantePrevio = ''; // Guardar representante da seção anterior
+        let objetivoColIndex = 4; // Coluna padrão para objetivo (coluna E, índice 4)
 
         Array.from(rows).forEach((row, rowIdx) => {
           let cellsArray = row.querySelectorAll('c');
@@ -3852,8 +3853,25 @@ async function parsePlanoPlanilha(file){
 
           // ═══════════════════════════════════════════════════════════
           // DETECTAR NOVA SEÇÃO (cabeçalho de período)
+          // Suporta 3 formatos:
+          // 1. "(11) ATIVA REPRESENTAÇÕES - 3º TRIMESTRE"
+          // 2. "PEREIRA MEDINA Planos - 3º TRIMESTRE"
+          // 3. "RBR REPRESENTAÇÕES" (representante só, default TRIMESTRAL)
           // ═══════════════════════════════════════════════════════════
-          if ((firstCellVal.toUpperCase().includes('PLANOS') && (firstCellVal.toUpperCase().includes('TRIMESTRE') || firstCellVal.toUpperCase().includes('SEMESTRE'))) || firstCellVal.match(/Planos.*SEMESTRE/i)) {
+          const isSecaoHeader = (
+            (firstCellVal.toUpperCase().includes('PLANOS') && (firstCellVal.toUpperCase().includes('TRIMESTRE') || firstCellVal.toUpperCase().includes('SEMESTRE'))) ||
+            firstCellVal.match(/Planos.*SEMESTRE/i) ||
+            (firstCellVal.toUpperCase().includes('REPRESENTAÇÕES') && rowIdx < 5) // Primeiras 5 linhas, contém REPRESENTAÇÕES
+          );
+
+          if (rowIdx < 10 && firstCellVal.toUpperCase().includes('REPRESENTAÇÕES')) {
+            console.log(`  [Row ${rowNum}] Verificando: "${firstCellVal}"`);
+            console.log(`    - includes('REPRESENTAÇÕES'): ${firstCellVal.toUpperCase().includes('REPRESENTAÇÕES')}`);
+            console.log(`    - rowIdx < 5: ${rowIdx < 5}`);
+            console.log(`    - isSecaoHeader: ${isSecaoHeader}`);
+          }
+
+          if (isSecaoHeader) {
             // Salvar seção anterior
             if (secaoAtual) {
               secoes.push(secaoAtual);
@@ -3863,7 +3881,7 @@ async function parsePlanoPlanilha(file){
             secaoAtual = {
               titulo: firstCellVal,
               periodo: 'TRIMESTRAL',  // default
-              periodoNum: '',
+              periodoNum: '3', // default trimestre 3
               representante: '',
               grupos: [],
               headerRow: rowNum
@@ -3877,11 +3895,11 @@ async function parsePlanoPlanilha(file){
             } else if (firstCellVal.toUpperCase().includes('TRIMESTRE')) {
               secaoAtual.periodo = 'TRIMESTRAL';
               const match = firstCellVal.match(/(\d+)º\s+(?:Trimestre|TRIMESTRE)/i);
-              secaoAtual.periodoNum = match ? match[1] : '';
+              secaoAtual.periodoNum = match ? match[1] : '3';
             }
 
             // Extrair representante (múltiplos formatos)
-            // Formato 1: "(11) PEREIRA MEDINA - 3º TRIMESTRE"
+            // Formato 1: "(11) ATIVA REPRESENTAÇÕES - 3º TRIMESTRE"
             const match1 = firstCellVal.match(/\((\d+)\)\s+([^-]+?)\s*-/i);
             if (match1) {
               secaoAtual.representante = match1[2].trim().toUpperCase();
@@ -3891,10 +3909,17 @@ async function parsePlanoPlanilha(file){
               if (match2) {
                 secaoAtual.representante = match2[1].trim().toUpperCase();
               } else {
-                // Formato 3: Apenas extrair antes de "Planos"
-                const match3 = firstCellVal.match(/^(.+?)\s+Planos/i);
+                // Formato 3: "RBR REPRESENTAÇÕES" ou "ATIVA REPRESENTAÇÕES"
+                // Extrair tudo antes de " REPRESENTAÇÕES"
+                const match3 = firstCellVal.match(/^(.+?)\s+REPRESENTAÇÕES/i);
                 if (match3) {
                   secaoAtual.representante = match3[1].trim().toUpperCase();
+                } else {
+                  // Formato 4: Fallback - tentar extrair antes de "Planos"
+                  const match4 = firstCellVal.match(/^(.+?)\s+Planos/i);
+                  if (match4) {
+                    secaoAtual.representante = match4[1].trim().toUpperCase();
+                  }
                 }
               }
             }
@@ -3918,7 +3943,25 @@ async function parsePlanoPlanilha(file){
           // LINHAS DE CABEÇALHO (coluna A = "UF")
           // ═══════════════════════════════════════════════════════════
           if (firstCellVal === 'UF') {
-            // É cabeçalho, pular
+            // É cabeçalho - detectar coluna de objetivo
+            // Procurar por "Objetivo", "Meta", "Falta", etc
+            for (let col = 3; col <= 10; col++) {
+              const headerVal = getCellValue(cellMap, col).toUpperCase();
+              if (headerVal.includes('META') || headerVal.includes('OBJETIVO') ||
+                  headerVal.includes('TRIMESTRAL') || headerVal.includes('SEMESTRAL')) {
+                // Encontrou uma coluna que pode ser objetivo
+                // Prioridade: coluna com TRIMESTRAL/SEMESTRAL > META > OBJETIVO
+                if (headerVal.includes('TRIMESTRAL') || headerVal.includes('SEMESTRAL')) {
+                  objetivoColIndex = col;
+                  console.log(`📊 Detectado objetivo em coluna ${col} (${headerVal})`);
+                  break;
+                } else if (!headerVal.includes('MENSAL')) {
+                  // Usar se não for "MENSAL"
+                  objetivoColIndex = col;
+                  console.log(`📊 Detectado objetivo em coluna ${col} (${headerVal})`);
+                }
+              }
+            }
             return;
           }
 
@@ -3937,15 +3980,20 @@ async function parsePlanoPlanilha(file){
           const codCli = getCellValue(cellMap, 1).trim();
           const cliente = getCellValue(cellMap, 2).trim();
           const total = parseFloat(getCellValue(cellMap, 3)) || 0;
-          const objetivo = parseFloat(getCellValue(cellMap, 4)) || 0;
+          const objetivo = parseFloat(getCellValue(cellMap, objetivoColIndex)) || 0;
           const falta = objetivo - total;
           const resultadoPct = objetivo > 0 ? (total / objetivo) : 0;
 
           // Skip linhas TOTAL
-          if (cliente.includes('TOTAL') || cliente.includes('total')) return;
+          if (cliente.includes('TOTAL') || cliente.includes('total')) {
+            console.log(`  ⏭️  Pulando linha TOTAL: "${cliente}"`);
+            return;
+          }
 
           // Skip se não tem UF e cliente (linha vazia)
-          if (!uf && !cliente) return;
+          if (!uf && !cliente) {
+            return;
+          }
 
           // ═══════════════════════════════════════════════════════════
           // TODOS OS CLIENTES VÃO PARA O GRUPO PERÍODO-ESPECÍFICO
@@ -3973,6 +4021,7 @@ async function parsePlanoPlanilha(file){
                   clientes: []
                 };
                 secaoAtual.grupos.push(grupoDestino);
+                console.log(`    + Grupo criado: ${temAgrupador} (${codCli})`);
               }
             } else {
               // Cliente sem agrupador - ir para CLIENTE TRIMESTRAIS/SEMESTRAIS
@@ -3992,6 +4041,7 @@ async function parsePlanoPlanilha(file){
                   clientes: []
                 };
                 secaoAtual.grupos.push(grupoDestino);
+                console.log(`    + Grupo criado: ${nomeGrupo}`);
               }
             }
 
@@ -4006,6 +4056,7 @@ async function parsePlanoPlanilha(file){
               resultadoPct: resultadoPct,
               periodo: secaoAtual.periodo
             });
+            console.log(`      • ${cliente}: R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})} / R$ ${objetivo.toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})}`);
 
             // Atualizar totais do grupo
             grupoDestino.total += total;
@@ -4029,6 +4080,18 @@ async function parsePlanoPlanilha(file){
           throw new Error('Nenhum dado encontrado no arquivo');
         }
 
+        // DEBUG: Log das seções encontradas
+        console.log('🔍 PARSER DEBUG:');
+        console.log(`  Seções encontradas: ${secoes.length}`);
+        secoes.forEach((sec, idx) => {
+          console.log(`  Seção ${idx + 1}:`);
+          console.log(`    - Titulo: "${sec.titulo}"`);
+          console.log(`    - Representante: "${sec.representante}"`);
+          console.log(`    - Período: ${sec.periodo} ${sec.periodoNum}`);
+          console.log(`    - Grupos: ${sec.grupos.length}`);
+          console.log(`    - Total de clientes: ${sec.grupos.reduce((sum, g) => sum + g.clientes.length, 0)}`);
+        });
+
         // Retornar array de seções
         // O importPlanoExcel() processará cada seção
         resolve(secoes);
@@ -4043,13 +4106,408 @@ async function parsePlanoPlanilha(file){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// DETECTAR FORMATO DO ARQUIVO (RBR vs PEREIRA/ATIVA)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function detectFormatoArquivo(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const zip = await JSZip.loadAsync(e.target.result);
+
+        // Ler shared strings para buscar por "REPRESENTAÇÕES"
+        const sharedStringsXml = await zip.file('xl/sharedStrings.xml').async('string');
+
+        const isRBRFormat = sharedStringsXml.includes('REPRESENTAÇÕES') && !sharedStringsXml.includes('Planos');
+
+        console.log(`📋 Formato detectado: ${isRBRFormat ? 'RBR REPRESENTAÇÕES' : 'PEREIRA/ATIVA/IG'}`);
+        resolve(isRBRFormat ? 'RBR' : 'STANDARD');
+      } catch (err) {
+        console.warn('Não consegui detectar formato, usando STANDARD');
+        resolve('STANDARD');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PARSER RBR - Com suporte a AGRUPADORES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function parsePlanoPlanilhaRBR(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const zip = await JSZip.loadAsync(e.target.result);
+
+        // Ler shared strings
+        const sharedStringsXml = await zip.file('xl/sharedStrings.xml').async('string');
+        const parser = new DOMParser();
+        const sXmlDoc = parser.parseFromString(sharedStringsXml, 'application/xml');
+        const sharedStrings = [];
+
+        sXmlDoc.querySelectorAll('si').forEach(si => {
+          const t = si.querySelector('t');
+          sharedStrings.push(t ? t.textContent : '');
+        });
+
+        // Ler worksheet - SEMPRE ler Sheet1 (dados com totais e agrupadores)
+        console.log(`📋 [RBR] Lendo Sheet1 (dados principais)`);
+
+        let xmlStr;
+        try {
+          xmlStr = await zip.file('xl/worksheets/sheet1.xml').async('string');
+        } catch (err) {
+          throw new Error(`Sheet1 não encontrado: ${err.message}`);
+        }
+
+        const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
+        let rows = xmlDoc.querySelectorAll('row');
+
+        const getCellValue = (cellMap, colIdx) => {
+          const cell = cellMap[colIdx];
+          if (!cell) return '';
+          const { value, type } = cell;
+          if (type === 's') {
+            const idx = parseInt(value);
+            return sharedStrings[idx] || '';
+          }
+          return value;
+        };
+
+        const getColIndex = (cellRef) => {
+          const match = cellRef.match(/^([A-Z]+)/);
+          if (!match) return -1;
+          let col = 0;
+          for (let char of match[1]) {
+            col = col * 26 + (char.charCodeAt(0) - 64);
+          }
+          return col - 1;
+        };
+
+        // ============================================================
+        // EXTRAIR MERGED CELLS (indicam agrupamentos)
+        // ============================================================
+        const mergedCellsMap = new Map(); // { startRow: endRow }
+        const mergeCells = xmlDoc.querySelectorAll('mergeCell');
+        console.log(`📊 Encontradas ${mergeCells.length} merged cells`);
+
+        mergeCells.forEach(merge => {
+          const ref = merge.getAttribute('ref');
+          const match = ref.match(/D(\d+):D(\d+)/); // Procura por D (coluna de Total)
+          if (match) {
+            const startRow = parseInt(match[1]);
+            const endRow = parseInt(match[2]);
+            mergedCellsMap.set(startRow, endRow);
+            console.log(`  └─ D${startRow}:D${endRow} (grupo de ${endRow - startRow + 1} linhas)`);
+          }
+        });
+
+        // ============================================================
+        // Primeira passagem: Ler todas as linhas
+        // ============================================================
+
+        const allRows = [];
+
+        Array.from(rows).forEach((row, rowIdx) => {
+          let cellsArray = row.querySelectorAll('c');
+          const rowNum = parseInt(row.getAttribute('r') || rowIdx + 1);
+
+          const cellMap = {};
+          Array.from(cellsArray).forEach(cell => {
+            const cellRef = cell.getAttribute('r');
+            const colIdx = getColIndex(cellRef);
+            if (colIdx >= 0) {
+              const t = cell.getAttribute('t') || 'n';
+              let v = cell.querySelector('v');
+              if (!v) {
+                const vElements = cell.getElementsByTagName('v');
+                v = vElements.length > 0 ? vElements[0] : null;
+              }
+              const value = v ? v.textContent : '';
+              cellMap[colIdx] = { value: value, type: t };
+            }
+          });
+
+          allRows.push({
+            rowNum: rowNum,
+            rowIdx: rowIdx,
+            cellMap: cellMap,
+            uf: getCellValue(cellMap, 0).trim(),
+            codCli: getCellValue(cellMap, 1).trim(),
+            cliente: getCellValue(cellMap, 2).trim(),
+            total: parseFloat(getCellValue(cellMap, 3)) || 0,
+            metaMensal: parseFloat(getCellValue(cellMap, 4)) || 0,
+            metaTrimestral: parseFloat(getCellValue(cellMap, 5)) || 0
+          });
+        });
+
+        console.log(`📊 [RBR] Total de linhas: ${allRows.length}`);
+
+        // DEBUG: Mostrar primeiras 20 linhas para entender estrutura
+        console.log('\n🔍 DEBUG - Primeiras 20 linhas do arquivo:');
+        for (let j = 0; j < Math.min(20, allRows.length); j++) {
+          const row = allRows[j];
+          const temAgrupador = /AGRUPADOR|GRUPO\s|GROUP/.test(row.cliente.toUpperCase());
+          console.log(`  Row ${j}: UF=${row.uf} | CodCli=${row.codCli} | Cliente="${row.cliente}" | Total=${row.total} | Meta Trim=${row.metaTrimestral} | AGRUPADOR? ${temAgrupador}`);
+        }
+
+        // Contar quantas linhas tem "AGRUPADOR" (ou variações)
+        const linhasComAgrupador = allRows.filter(r => /AGRUPADOR|GRUPO\s|GROUP/.test(r.cliente.toUpperCase())).length;
+        console.log(`\n📊 [RBR] Linhas com AGRUPADOR: ${linhasComAgrupador}`);
+        console.log(`📊 [RBR] Linhas SEM AGRUPADOR: ${allRows.length - linhasComAgrupador}`);
+
+        // ============================================================
+        // Detectar linha de header dinamicamente
+        // ============================================================
+        let headerRowIdx = -1;
+        for (let k = 0; k < Math.min(5, allRows.length); k++) {
+          if (allRows[k].cliente === 'UF' || allRows[k].cliente === 'Cliente') {
+            headerRowIdx = k;
+            console.log(`📋 Header detectado na linha ${k}: ${allRows[k].cliente}`);
+            break;
+          }
+        }
+        if (headerRowIdx === -1) headerRowIdx = 0; // fallback
+
+        // ============================================================
+        // PRIMEIRA PASSAGEM: Mapear grupos usando MERGED CELLS
+        // ============================================================
+        console.log(`\n🔍 PASSAGEM 1: Mapeando grupos por merged cells...`);
+
+        const gruposMap = new Map(); // { agrupadorIdx: { nome, filhos: [idx1, idx2] } }
+        const linhasQuesSaoFilhos = new Set(); // Índices de linhas que são filhos
+        const ehAgrupador = (idx) => /AGRUPADOR|GRUPO\s|GROUP/.test(allRows[idx].cliente.toUpperCase());
+
+        // Processar merged cells para definir grupos
+        for (const [startRow, endRow] of mergedCellsMap) {
+          console.log(`\n  📋 Grupo: rows ${startRow}-${endRow}`);
+
+          // Procurar agrupador dentro deste range
+          let agrupadorIdx = -1;
+          let agrupadorNome = '';
+
+          for (let rowNum = startRow; rowNum <= endRow; rowNum++) {
+            // Encontrar o allRows index para este rowNum
+            const idx = allRows.findIndex(r => r.rowNum === rowNum);
+            if (idx >= 0 && ehAgrupador(idx)) {
+              agrupadorIdx = idx;
+              agrupadorNome = allRows[idx].cliente.replace(/\s+AGRUPADOR/i, '').trim();
+              console.log(`     🏢 Agrupador encontrado: ${agrupadorNome} (row ${rowNum}, allRows idx ${idx})`);
+              break;
+            }
+          }
+
+          // Se encontrou agrupador, coletar todos os outros como filhos
+          if (agrupadorIdx >= 0) {
+            const filhos = [];
+
+            for (let rowNum = startRow; rowNum <= endRow; rowNum++) {
+              const idx = allRows.findIndex(r => r.rowNum === rowNum);
+              if (idx >= 0 && idx !== agrupadorIdx) {
+                const linha = allRows[idx];
+                if (linha.cliente && !linha.cliente.includes('TOTAL')) {
+                  console.log(`     ├─ Filho: ${linha.codCli} ${linha.cliente}`);
+                  filhos.push(idx);
+                  linhasQuesSaoFilhos.add(idx);
+                }
+              }
+            }
+
+            gruposMap.set(agrupadorIdx, { nome: agrupadorNome, filhos: filhos });
+            console.log(`     └─ Total de filhos: ${filhos.length}`);
+          }
+        }
+
+        console.log(`\n✅ Mapeamento completo: ${gruposMap.size} agrupadores encontrados`);
+
+        // ============================================================
+        // SEGUNDA PASSAGEM: Processar com conhecimento de grupos
+        // ============================================================
+        console.log(`\n⚙️  PASSAGEM 2: Processando grupos e clientes...`);
+
+        const secaoAtual = {
+          titulo: 'RBR REPRESENTAÇÕES',
+          periodo: 'TRIMESTRAL',
+          periodoNum: '3',
+          representante: 'RBR',
+          grupos: [],
+          headerRow: 2
+        };
+
+        for (let i = headerRowIdx + 1; i < allRows.length; i++) {
+          const linha = allRows[i];
+
+          // Pular linhas vazias/headers/totais
+          if (!linha.cliente || linha.cliente === 'UF' || linha.cliente.includes('TOTAL')) {
+            continue;
+          }
+
+          // Se é filho de um agrupador, pular (será processado com o agrupador)
+          if (linhasQuesSaoFilhos.has(i)) {
+            continue;
+          }
+
+          // ========================================================
+          // PROCESSAR AGRUPADOR (com filhos mapeados)
+          // ========================================================
+          if (gruposMap.has(i)) {
+            const grupoInfo = gruposMap.get(i);
+            console.log(`  🏢 PROCESSANDO AGRUPADOR: ${grupoInfo.nome}`);
+
+            let totalAgrupador = linha.total;
+            let objetivoAgrupador = linha.metaTrimestral;
+            const clientesFilhos = [];
+
+            // Processar filhos mapeados
+            console.log(`     └─ Adicionando ${grupoInfo.filhos.length} filhos...`);
+
+            for (let filhoIdx of grupoInfo.filhos) {
+              const filho = allRows[filhoIdx];
+              if (!filho.cliente || !filho.uf) continue;
+
+              console.log(`        • ${filho.codCli} ${filho.cliente}`);
+
+              clientesFilhos.push({
+                uf: filho.uf,
+                codCli: filho.codCli,
+                cliente: filho.cliente,
+                total: filho.total,
+                objetivo: filho.metaTrimestral,
+                falta: filho.metaTrimestral - filho.total,
+                resultadoPct: filho.metaTrimestral > 0 ? filho.total / filho.metaTrimestral : 0
+              });
+
+              // Somar aos totais do agrupador
+              totalAgrupador += filho.total;
+              objetivoAgrupador += filho.metaTrimestral;
+            }
+
+            // Criar grupo para este agrupador
+            const falta = objetivoAgrupador - totalAgrupador;
+            const resultadoPct = objetivoAgrupador > 0 ? totalAgrupador / objetivoAgrupador : 0;
+
+            secaoAtual.grupos.push({
+              nome: grupoInfo.nome,
+              uf: linha.uf,
+              codCli: linha.codCli,
+              total: totalAgrupador,
+              objetivo: objetivoAgrupador,
+              falta: falta,
+              resultadoPct: resultadoPct,
+              periodo: 'TRIMESTRAL',
+              clientes: clientesFilhos
+            });
+          }
+          // ========================================================
+          // PROCESSAR CLIENTE INDIVIDUAL (não está em nenhum grupo)
+          // ========================================================
+          else if (ehAgrupador(i)) {
+            // Agrupador sem merged cell mapping (fallback)
+            console.log(`  🏢 AGRUPADOR SEM GRUPO MAPEADO: ${linha.cliente}`);
+
+            const nomeAgrupador = linha.cliente.replace(/\s+AGRUPADOR/i, '').trim();
+            const falta = linha.metaTrimestral - linha.total;
+            const resultadoPct = linha.metaTrimestral > 0 ? linha.total / linha.metaTrimestral : 0;
+
+            secaoAtual.grupos.push({
+              nome: nomeAgrupador,
+              uf: linha.uf,
+              codCli: linha.codCli,
+              total: linha.total,
+              objetivo: linha.metaTrimestral,
+              falta: falta,
+              resultadoPct: resultadoPct,
+              periodo: 'TRIMESTRAL',
+              clientes: []
+            });
+          }
+          else {
+            // Cliente individual
+            if (linha.cliente && linha.uf) {
+              console.log(`  👤 CLIENTE INDIVIDUAL: ${linha.cliente}`);
+
+              const falta = linha.metaTrimestral - linha.total;
+              const resultadoPct = linha.metaTrimestral > 0 ? linha.total / linha.metaTrimestral : 0;
+
+              secaoAtual.grupos.push({
+                nome: linha.cliente,
+                uf: linha.uf,
+                codCli: linha.codCli,
+                total: linha.total,
+                objetivo: linha.metaTrimestral,
+                falta: falta,
+                resultadoPct: resultadoPct,
+                periodo: 'TRIMESTRAL',
+                clientes: []
+              });
+            }
+          }
+        }
+
+        // Se não encontrou agrupadores, usar fallback
+        if (secaoAtual.grupos.length === 0) {
+          console.log('\n⚠️ FALLBACK: Nenhum agrupador detectado, tratando todos como clientes individuais');
+
+          // Adicionar todos os clientes como grupos individuais
+          for (let row of allRows) {
+            if (row.cliente && row.cliente !== 'UF' && !row.cliente.includes('TOTAL') && row.uf) {
+              const falta = row.metaTrimestral - row.total;
+              const resultadoPct = row.metaTrimestral > 0 ? row.total / row.metaTrimestral : 0;
+
+              secaoAtual.grupos.push({
+                nome: row.cliente,
+                uf: row.uf,
+                codCli: row.codCli,
+                total: row.total,
+                objetivo: row.metaTrimestral,
+                falta: falta,
+                resultadoPct: resultadoPct,
+                periodo: 'TRIMESTRAL',
+                clientes: []
+              });
+            }
+          }
+        }
+
+        if (secaoAtual.grupos.length === 0) {
+          throw new Error('Nenhum grupo encontrado após todas as tentativas');
+        }
+
+        console.log(`\n✅ [RBR] ${secaoAtual.grupos.length} grupos carregados`);
+        console.log(`   ${linhasComAgrupador > 0 ? '(com agrupadores consolidados)' : '(clientes individuais - fallback)'}`);
+
+        resolve([secaoAtual]);
+
+      } catch (err) {
+        console.error('❌ Erro ao parsear RBR:', err);
+        reject(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // NOVA FUNÇÃO: Processar múltiplas seções
 // ═══════════════════════════════════════════════════════════════════════════════
 
 async function importPlanoExcel(event){
-  const files = event.target.files;
-  if (!files.length) return;
+  console.log('🚀 importPlanoExcel INICIADO');
+  console.log(`event:`, event);
+  console.log(`event.target:`, event.target);
+  console.log(`event.target.files:`, event.target.files);
 
+  const files = event.target.files;
+  if (!files.length) {
+    console.log('⚠️  Nenhum arquivo selecionado');
+    return;
+  }
+
+  console.log(`✓ ${files.length} arquivo(s) selecionado(s)`);
   $('plano-import-status').textContent = '📥 Processando arquivos...';
 
   try {
@@ -4058,9 +4516,27 @@ async function importPlanoExcel(event){
 
     for (let file of fileList) {
       try {
-        const secoes = await parsePlanoPlanilha(file); // Retorna ARRAY de seções
+        console.log(`📄 Processando arquivo: ${file.name}`);
+
+        // Detectar formato do arquivo
+        const formato = await detectFormatoArquivo(file);
+        console.log(`  Formato: ${formato}`);
+
+        // Chamar parser correto
+        let secoes;
+        if (formato === 'RBR') {
+          secoes = await parsePlanoPlanilhaRBR(file);
+        } else {
+          secoes = await parsePlanoPlanilha(file);
+        }
+        console.log(`✓ Parser retornou ${secoes.length} seção(ões)`);
 
         for (let secao of secoes) {
+          console.log(`\n📋 Processando seção:`);
+          console.log(`  - Representante (raw): "${secao.representante}"`);
+          console.log(`  - Período: ${secao.periodo} ${secao.periodoNum}`);
+          console.log(`  - Grupos: ${secao.grupos.length}`);
+
           // Cada seção é um período diferente
           const dadosPlano = {
             representante: secao.representante,
@@ -4071,13 +4547,19 @@ async function importPlanoExcel(event){
           };
 
           if (!dadosPlano.representante) {
+            console.log(`⚠️  Representante vazio, pedindo ao usuário`);
             dadosPlano.representante = prompt(`Qual é o representante para "${file.name}"?`) || 'SEM REP';
           }
 
           if (!dadosPlano.periodoNum) {
+            console.log(`⚠️  PeriodoNum vazio, pedindo ao usuário`);
             dadosPlano.periodoNum = prompt(`Qual período para "${file.name}"? (1-4)`) || '3';
             dadosPlano.trimestre = dadosPlano.periodoNum;
           }
+
+          console.log(`✓ Dados prontos:`);
+          console.log(`  - Representante: "${dadosPlano.representante}"`);
+          console.log(`  - É número? ${isNaN(dadosPlano.representante)}`);
 
           if (!PLANO_BY_REP[dadosPlano.representante]) {
             PLANO_BY_REP[dadosPlano.representante] = [];
@@ -4092,10 +4574,11 @@ async function importPlanoExcel(event){
           PLANO_BY_REP[dadosPlano.representante].push(dadosPlano);
           successCount++;
 
-          console.log(`✓ Importado: ${dadosPlano.representante} - ${dadosPlano.periodo} ${dadosPlano.periodoNum}`);
+          console.log(`✅ Importado: ${dadosPlano.representante} - ${dadosPlano.periodo} ${dadosPlano.periodoNum}`);
         }
       } catch (err) {
-        console.error(`Erro ao importar ${file.name}:`, err);
+        console.error(`❌ Erro ao importar ${file.name}:`, err);
+        console.error(err.stack);
       }
     }
 
@@ -4125,8 +4608,31 @@ async function importPlanoExcel(event){
 
     applyPlanoFilter();
   } catch (err) {
-    $('plano-import-status').textContent = '❌ Erro ao importar: ' + err.message;
+    console.error('❌ ERRO GERAL:', err);
+    console.error('Stack:', err.stack);
+    const statusMsg = `❌ Erro ao importar: ${err.message}`;
+    $('plano-import-status').textContent = statusMsg;
+    console.log(`📌 Dados em PLANO_BY_REP:`, JSON.stringify(PLANO_BY_REP, null, 2));
   }
+}
+
+// Função de diagnóstico: chamar pelo console!
+function debugPlano() {
+  console.log('=== DEBUG PLANO ===');
+  console.log('PLANO_BY_REP keys:', Object.keys(PLANO_BY_REP));
+  console.log('PLANO_BY_REP completo:', JSON.stringify(PLANO_BY_REP, null, 2));
+
+  const repSelect = document.getElementById('plano-rep-select');
+  if (repSelect) {
+    console.log('Opções no dropdown:', Array.from(repSelect.options).map(o => o.value));
+  }
+
+  const tbody = document.getElementById('plano-tbody');
+  if (tbody) {
+    console.log('Linhas na tabela:', tbody.rows.length);
+  }
+
+  return PLANO_BY_REP;
 }
 
 function refreshPlanoDisplay(){
