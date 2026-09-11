@@ -3648,7 +3648,17 @@ function savePlanoByRep(){
 
 function loadPlanoByRep(){
   const saved = localStorage.getItem('PLANO_BY_REP');
-  PLANO_BY_REP = saved ? JSON.parse(saved) : {};
+  const data = saved ? JSON.parse(saved) : {};
+
+  // Filtrar representantes inválidos (números simples, strings vazias)
+  const filtered = {};
+  Object.keys(data).forEach(rep => {
+    if (rep && rep.trim() && isNaN(rep)) {
+      filtered[rep] = data[rep];
+    }
+  });
+
+  PLANO_BY_REP = filtered;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -4094,7 +4104,11 @@ async function importPlanoExcel(event){
     // Atualizar interface
     const repSelect = $('plano-rep-select');
     if (repSelect) {
-      const reps = Object.keys(PLANO_BY_REP).sort();
+      // Filtrar representantes válidos (remover números simples, strings vazias, etc)
+      const reps = Object.keys(PLANO_BY_REP)
+        .filter(rep => rep && rep.trim() && isNaN(rep)) // Remover vazio, números, etc
+        .sort();
+
       repSelect.innerHTML = '<option value="">Todos os Representantes</option>';
       reps.forEach(rep => {
         const opt = document.createElement('option');
@@ -4120,7 +4134,11 @@ function refreshPlanoDisplay(){
   const repSelect = $('plano-rep-select');
   if (!repSelect) return;
 
-  const reps = Object.keys(PLANO_BY_REP).sort();
+  // Filtrar representantes válidos (remover números simples, strings vazias, etc)
+  const reps = Object.keys(PLANO_BY_REP)
+    .filter(rep => rep && rep.trim() && isNaN(rep)) // Remover vazio, números, etc
+    .sort();
+
   repSelect.innerHTML = '<option value="">Todos os Representantes</option>';
   reps.forEach(rep => {
     const opt = document.createElement('option');
