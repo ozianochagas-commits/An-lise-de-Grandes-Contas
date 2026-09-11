@@ -1077,6 +1077,17 @@
       </div>
       <p>Importe a planilha de <strong>Plano de Negócio</strong> (Excel) com os dados trimestrais de faturamento, carteira e rebate. Acompanhe as metas e o desempenho de cada representante.</p>
     </div>
+    <div class="htotal" style="text-align:right;">
+      <div style="font-size:9px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-bottom:6px;">📊 Resultado do Plano</div>
+      <div style="display:flex;gap:18px;justify-content:flex-end;margin-bottom:10px;">
+        <div><div style="font-size:8px;opacity:.65;text-transform:uppercase;letter-spacing:.5px;">Faturado</div><strong id="plano-htotal-faturado" style="font-size:15px;color:#fff;font-weight:900;">R$ 0</strong></div>
+        <div><div style="font-size:8px;opacity:.65;text-transform:uppercase;letter-spacing:.5px;">Objetivo</div><strong id="plano-htotal-objetivo" style="font-size:15px;color:var(--orange2);font-weight:900;">R$ 0</strong></div>
+        <div><div style="font-size:8px;opacity:.65;text-transform:uppercase;letter-spacing:.5px;">Falta</div><strong id="plano-htotal-falta" style="font-size:15px;color:#7CB342;font-weight:900;">R$ 0</strong></div>
+      </div>
+      <div style="border-top:1px solid rgba(255,255,255,.15);padding-top:8px;">
+        <span>Resultado Geral</span><strong id="plano-htotal-pct" style="font-size:20px;color:var(--orange2);font-weight:900;">0%</strong>
+      </div>
+    </div>
   </div>
 
   <!-- SELETOR DE REPRESENTANTE -->
@@ -1109,40 +1120,76 @@
 
   <!-- ÁREA DE RESULTADOS (oculta até importar) -->
   <div id="plano-results" style="display:none;">
-    <div id="plano-import-controls" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap;">
-      <div style="flex:1;min-width:220px;">
-        <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">🔍 Filtro de Trimestre:</label>
-        <select id="plano-trimestre-filter" onchange="applyPlanoFilter()" style="width:100%;margin-top:6px;padding:8px 12px;border:2px solid #E0E0E0;border-radius:7px;font-size:11px;font-weight:600;outline:none;cursor:pointer;">
-          <option value="">Todos os trimestres</option>
-          <option value="1">1º Trimestre</option>
-          <option value="2">2º Trimestre</option>
-          <option value="3">3º Trimestre</option>
-          <option value="4">4º Trimestre</option>
-        </select>
-      </div>
-      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-        <button class="pdf-btn" onclick="exportPlanoPDF()" style="margin:0;">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 4h5v7h7v9H6V4z"/></svg>
-          Exportar PDF
-        </button>
-        <button class="reset-btn" onclick="clearPlanoImport()" style="height:38px;border-radius:6px">↺ Nova Importação</button>
-      </div>
-    </div>
+    <!-- Grid: Tabela esquerda + Resumo direita -->
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;margin-bottom:24px;">
+      <!-- ESQUERDA: Controles e Tabela -->
+      <div>
+        <div id="plano-import-controls" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:220px;">
+            <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">🔍 Filtro de Trimestre:</label>
+            <select id="plano-trimestre-filter" onchange="applyPlanoFilter()" style="width:100%;margin-top:6px;padding:8px 12px;border:2px solid #E0E0E0;border-radius:7px;font-size:11px;font-weight:600;outline:none;cursor:pointer;">
+              <option value="">Todos os trimestres</option>
+              <option value="1">1º Trimestre</option>
+              <option value="2">2º Trimestre</option>
+              <option value="3">3º Trimestre</option>
+              <option value="4">4º Trimestre</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+            <button class="pdf-btn" onclick="exportPlanoPDF()" style="margin:0;">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 4h5v7h7v9H6V4z"/></svg>
+              Exportar PDF
+            </button>
+            <button class="reset-btn" onclick="clearPlanoImport()" style="height:38px;border-radius:6px">↺ Nova Importação</button>
+          </div>
+        </div>
 
-    <div class="stitle" style="border-radius:8px 8px 0 0;">📋 &nbsp;Dados de Plano de Negócio</div>
-    <div class="twrap" style="overflow-x:auto;">
-      <table>
-        <thead><tr id="plano-thead">
-          <th style="text-align:left;padding-left:14px;">UF</th>
-          <th>Cod. Cliente</th>
-          <th>Cliente</th>
-          <th>Total R$</th>
-          <th>Objetivo R$</th>
-          <th>Falta R$</th>
-          <th>Resultado %</th>
-        </tr></thead>
-        <tbody id="plano-tbody"></tbody>
-      </table>
+        <div class="stitle" style="border-radius:8px 8px 0 0;">📋 &nbsp;Dados de Plano de Negócio</div>
+        <div class="twrap" style="overflow-x:auto;">
+          <table>
+            <thead><tr id="plano-thead">
+              <th style="text-align:left;padding-left:14px;">UF</th>
+              <th>Cod. Cliente</th>
+              <th>Cliente</th>
+              <th>Total R$</th>
+              <th>Objetivo R$</th>
+              <th>Falta R$</th>
+              <th>Resultado %</th>
+            </tr></thead>
+            <tbody id="plano-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- DIREITA: Painel de Resumo -->
+      <div id="plano-summary-panel" style="background:white;border-radius:10px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);height:fit-content;position:sticky;top:20px;">
+        <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;border-bottom:2px solid #f0f0f0;padding-bottom:8px;">📊 Totais do Plano</div>
+
+        <div style="margin-bottom:14px;">
+          <div style="font-size:9px;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Total Faturado</div>
+          <div style="font-size:18px;font-weight:900;color:var(--orange);" id="plano-total-faturado">R$ 0,00</div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <div style="font-size:9px;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Objetivo</div>
+          <div style="font-size:18px;font-weight:900;color:var(--dark);" id="plano-total-objetivo">R$ 0,00</div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <div style="font-size:9px;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Falta</div>
+          <div style="font-size:16px;font-weight:900;color:#c00;" id="plano-total-falta">R$ 0,00</div>
+        </div>
+
+        <div style="background:#f9f9f9;border-radius:8px;padding:12px;margin-bottom:14px;border-left:3px solid var(--orange);">
+          <div style="font-size:9px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Resultado Geral</div>
+          <div style="font-size:24px;font-weight:900;color:var(--dark);" id="plano-total-pct">0%</div>
+        </div>
+
+        <button class="pdf-btn" onclick="copyPlanoLink()" style="width:100%;margin:0;background:#1E7E34;font-size:11px;">
+          🔗 Link para Compartilhar
+        </button>
+        <div id="plano-link-status" style="font-size:10px;color:#999;margin-top:8px;text-align:center;display:none;">✓ Link copiado!</div>
+      </div>
     </div>
   </div>
 </div>
@@ -3604,14 +3651,107 @@ function loadPlanoByRep(){
   PLANO_BY_REP = saved ? JSON.parse(saved) : {};
 }
 
-// Parser melhorado para Excel Plano de Negócio
+// ═══════════════════════════════════════════════════════════════════════════════
+// Parser INTELIGENTE: Suporta múltiplas seções, formatos, e AGRUPAMENTO via CodCli
+// ═══════════════════════════════════════════════════════════════════════════════
+
 async function parsePlanoPlanilha(file){
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        // Usar JSZip para ler o arquivo
         const zip = await JSZip.loadAsync(e.target.result);
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // PASSO 1: Tentar ler segunda aba para mapa de clientes (Código Agrupador)
+        // ═══════════════════════════════════════════════════════════════════════════════
+        let codigoAgrupadorMap = {}; // CodCli -> Nome do Cliente
+        try {
+          const xmlList = await zip.file('xl/workbook.xml').async('string');
+          const parser = new DOMParser();
+          const workbookDoc = parser.parseFromString(xmlList, 'application/xml');
+
+          // Tentar ler sheet2.xml (segunda aba)
+          const sheet2File = zip.file('xl/worksheets/sheet2.xml');
+          if (sheet2File) {
+            const xmlStr2 = await sheet2File.async('string');
+            const xmlDoc2 = parser.parseFromString(xmlStr2, 'application/xml');
+
+            // Ler shared strings
+            const sharedStringsXml = await zip.file('xl/sharedStrings.xml').async('string');
+            const sXmlDoc = parser.parseFromString(sharedStringsXml, 'application/xml');
+            const sharedStrings = [];
+
+            sXmlDoc.querySelectorAll('si').forEach(si => {
+              const t = si.querySelector('t');
+              sharedStrings.push(t ? t.textContent : '');
+            });
+
+            // Função helper para extrair valor de célula
+            const getCellValue2 = (row, colIdx) => {
+              const cells = row.querySelectorAll('c');
+              let colCount = 0;
+              for (let cell of cells) {
+                const cellRef = cell.getAttribute('r');
+                const match = cellRef.match(/^([A-Z]+)/);
+                if (match) {
+                  let col = 0;
+                  for (let char of match[1]) {
+                    col = col * 26 + (char.charCodeAt(0) - 64);
+                  }
+                  col -= 1; // 0-indexed
+
+                  if (col === colIdx) {
+                    const t = cell.getAttribute('t') || 'n';
+                    let v = cell.querySelector('v');
+                    if (!v) {
+                      const vElements = cell.getElementsByTagName('v');
+                      v = vElements.length > 0 ? vElements[0] : null;
+                    }
+                    const value = v ? v.textContent : '';
+                    if (t === 's') {
+                      const idx = parseInt(value);
+                      return sharedStrings[idx] || '';
+                    }
+                    return value;
+                  }
+                }
+              }
+              return '';
+            };
+
+            // Procurar linhas com "Código Agrupador"
+            let rows2 = xmlDoc2.querySelectorAll('row');
+            let foundHeader = false;
+            let codigoCol = -1, nomeCol = -1;
+
+            Array.from(rows2).forEach((row, idx) => {
+              if (!foundHeader) {
+                // Procurar header com "Código" ou "CÓD"
+                const firstCellVal = getCellValue2(row, 0);
+                if (firstCellVal && (firstCellVal.includes('CÓD') || firstCellVal.includes('Código') || firstCellVal === 'UF')) {
+                  foundHeader = true;
+                  // Assumir: Col 1=Código, Col 2=Cliente
+                  codigoCol = 1;
+                  nomeCol = 2;
+                }
+              } else {
+                // Ler dados
+                const codigo = getCellValue2(row, codigoCol).trim();
+                const nome = getCellValue2(row, nomeCol).trim();
+                if (codigo && nome) {
+                  codigoAgrupadorMap[codigo] = nome;
+                }
+              }
+            });
+          }
+        } catch (err) {
+          console.warn('⚠️ Não consegui ler segunda aba para mapa de clientes:', err);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // PASSO 2: Ler primeira aba (dados de plano) como antes
+        // ═══════════════════════════════════════════════════════════════════════════════
 
         // Ler shared strings
         const sharedStringsXml = await zip.file('xl/sharedStrings.xml').async('string');
@@ -3619,12 +3759,10 @@ async function parsePlanoPlanilha(file){
         const sXmlDoc = parser.parseFromString(sharedStringsXml, 'application/xml');
         const sharedStrings = [];
 
-        // Usar namespace-aware query
         sXmlDoc.querySelectorAll('[tagName="si"]').forEach(si => {
           const t = si.querySelector('[tagName="t"]');
           sharedStrings.push(t ? t.textContent : '');
         });
-        // Fallback sem namespace
         if (sharedStrings.length === 0) {
           sXmlDoc.querySelectorAll('si').forEach(si => {
             const t = si.querySelector('t');
@@ -3636,57 +3774,26 @@ async function parsePlanoPlanilha(file){
         const xmlStr = await zip.file('xl/worksheets/sheet1.xml').async('string');
         const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
 
-        // Procurar por row elements com namespace awareness
         let rows = xmlDoc.querySelectorAll('[tagName="row"]');
         if (rows.length === 0) {
           rows = xmlDoc.querySelectorAll('row');
         }
         if (rows.length === 0) {
-          // Tenta usando getElementsByTagName que funciona melhor com namespaces
           rows = xmlDoc.getElementsByTagName('row');
         }
 
-        let representante = '';
-        let trimestre = '';
-        let dados = {
-          trimestre: '',
-          representante: '',
-          grupos: []
-        };
-
-        let currentGrupo = null;
-        let grupoMap = {}; // Map de UF + nome -> grupo
-
-        const getCellValue = (cells, colIdx) => {
-          if (!cells || colIdx >= cells.length) return '';
-          const cell = cells[colIdx];
+        const getCellValue = (cellMap, colIdx) => {
+          const cell = cellMap[colIdx];
           if (!cell) return '';
-
-          const t = cell.getAttribute('t') || 'n';
-
-          // Procurar por elemento 'v' (value)
-          let v = cell.querySelector('v');
-          if (!v) {
-            // Tenta getElementsByTagName como fallback
-            const vElements = cell.getElementsByTagName('v');
-            v = vElements.length > 0 ? vElements[0] : null;
-          }
-
-          const value = v ? v.textContent : '';
-
-          if (!value) return '';
-
-          if (t === 's') {
+          const { value, type } = cell;
+          if (type === 's') {
             const idx = parseInt(value);
             return sharedStrings[idx] || '';
           }
-
-          // Limpar fórmulas
-          if (value.startsWith('=')) return '';
+          if (value && value.startsWith('=')) return '';
           return value;
         };
 
-        // Função para extrair coluna do atributo 'r' (ex: "A1" -> 0, "B1" -> 1)
         const getColIndex = (cellRef) => {
           const match = cellRef.match(/^([A-Z]+)/);
           if (!match) return -1;
@@ -3697,15 +3804,21 @@ async function parsePlanoPlanilha(file){
           return col - 1;
         };
 
-        // Processar linhas
-        let lineCount = 0;
+        // ═══════════════════════════════════════════════════════════
+        // ESTRATÉGIA: Processar por SEÇÕES
+        // Seção = cabeçalho + dados relacionados
+        // ═══════════════════════════════════════════════════════════
+
+        const secoes = []; // Array de seções encontradas
+        let secaoAtual = null;
+        let representantePrevio = ''; // Guardar representante da seção anterior
+
         Array.from(rows).forEach((row, rowIdx) => {
           let cellsArray = row.querySelectorAll('c');
           if (cellsArray.length === 0) {
             cellsArray = row.getElementsByTagName('c');
           }
 
-          lineCount++;
           const rowNum = parseInt(row.getAttribute('r') || rowIdx + 1);
 
           // Criar mapa de coluna -> valor
@@ -3725,93 +3838,191 @@ async function parsePlanoPlanilha(file){
             }
           });
 
-          // Linha 1: Cabeçalho com representante e trimestre
-          if (rowNum === 1) {
-            const headerVal = cellMap[0];
-            if (headerVal) {
-              const headerText = headerVal.type === 's' ? (sharedStrings[parseInt(headerVal.value)] || '') : headerVal.value;
-              const match = headerText.match(/\((\d+)\)\s+([^-]+)\s*-\s*(\d+)º/i);
-              if (match) {
-                representante = match[2].trim().toUpperCase();
-                trimestre = match[3];
-              }
-              dados.representante = representante;
-              dados.trimestre = trimestre;
+          const firstCellVal = getCellValue(cellMap, 0).trim();
+
+          // ═══════════════════════════════════════════════════════════
+          // DETECTAR NOVA SEÇÃO (cabeçalho de período)
+          // ═══════════════════════════════════════════════════════════
+          if ((firstCellVal.toUpperCase().includes('PLANOS') && (firstCellVal.toUpperCase().includes('TRIMESTRE') || firstCellVal.toUpperCase().includes('SEMESTRE'))) || firstCellVal.match(/Planos.*SEMESTRE/i)) {
+            // Salvar seção anterior
+            if (secaoAtual) {
+              secoes.push(secaoAtual);
             }
+
+            // Criar nova seção
+            secaoAtual = {
+              titulo: firstCellVal,
+              periodo: 'TRIMESTRAL',  // default
+              periodoNum: '',
+              representante: '',
+              grupos: [],
+              headerRow: rowNum
+            };
+
+            // Extrair período (Trimestre ou Semestre) - case insensitive
+            if (firstCellVal.toUpperCase().includes('SEMESTRE')) {
+              secaoAtual.periodo = 'SEMESTRAL';
+              const match = firstCellVal.match(/(\d+)º\s+(?:Semestre|SEMESTRE)/i);
+              secaoAtual.periodoNum = match ? match[1] : '2';
+            } else if (firstCellVal.toUpperCase().includes('TRIMESTRE')) {
+              secaoAtual.periodo = 'TRIMESTRAL';
+              const match = firstCellVal.match(/(\d+)º\s+(?:Trimestre|TRIMESTRE)/i);
+              secaoAtual.periodoNum = match ? match[1] : '';
+            }
+
+            // Extrair representante (múltiplos formatos)
+            // Formato 1: "(11) PEREIRA MEDINA - 3º TRIMESTRE"
+            const match1 = firstCellVal.match(/\((\d+)\)\s+([^-]+?)\s*-/i);
+            if (match1) {
+              secaoAtual.representante = match1[2].trim().toUpperCase();
+            } else {
+              // Formato 2: "PEREIRA MEDINA Planos - 3º TRIMESTRE"
+              const match2 = firstCellVal.match(/^([A-Z\s]+?)\s+Planos/i);
+              if (match2) {
+                secaoAtual.representante = match2[1].trim().toUpperCase();
+              } else {
+                // Formato 3: Apenas extrair antes de "Planos"
+                const match3 = firstCellVal.match(/^(.+?)\s+Planos/i);
+                if (match3) {
+                  secaoAtual.representante = match3[1].trim().toUpperCase();
+                }
+              }
+            }
+
+            // Se não achou representante, usar anterior
+            if (!secaoAtual.representante && representantePrevio) {
+              secaoAtual.representante = representantePrevio;
+            } else if (secaoAtual.representante) {
+              // Guardar novo representante para próximas seções
+              representantePrevio = secaoAtual.representante;
+            }
+            return; // Skip esta linha, é cabeçalho
+          }
+
+          // ═══════════════════════════════════════════════════════════
+          // SE NÃO TEMOS SEÇÃO ATIVA, PULAR
+          // ═══════════════════════════════════════════════════════════
+          if (!secaoAtual) return;
+
+          // ═══════════════════════════════════════════════════════════
+          // LINHAS DE CABEÇALHO (coluna A = "UF")
+          // ═══════════════════════════════════════════════════════════
+          if (firstCellVal === 'UF') {
+            // É cabeçalho, pular
             return;
           }
 
-          // Linha 2: Cabeçalho de colunas (pular)
-          if (rowNum === 2) return;
+          // ═══════════════════════════════════════════════════════════
+          // LINHAS EM BRANCO OU COM POUCO DADO
+          // ═══════════════════════════════════════════════════════════
+          if (!firstCellVal) {
+            // Linha em branco
+            return;
+          }
 
-          // Linhas 3+: Dados
-          // Estrutura do Excel: UF (0), CodCli (1), Cliente (2), Total Grupo (3), Objetivo (4), Falta (5), Resultado % (6)
-          const getCellVal = (colIdx) => {
-            const cell = cellMap[colIdx];
-            if (!cell) return '';
-            const { value, type } = cell;
-            if (type === 's') {
-              const idx = parseInt(value);
-              return sharedStrings[idx] || '';
-            }
-            if (value && value.startsWith('=')) return '';
-            return value;
-          };
-
-          const uf = getCellVal(0).trim();
-          const codCli = getCellVal(1).trim();
-          const cliente = getCellVal(2).trim();
-          const total = parseFloat(getCellVal(3)) || 0;
-          const objetivo = parseFloat(getCellVal(4)) || 0;
-          const falta = objetivo - total;  // Recalcular: FALTA = Objetivo - Total
+          // ═══════════════════════════════════════════════════════════
+          // PROCESSAR LINHA DE DADOS
+          // ═══════════════════════════════════════════════════════════
+          const uf = getCellValue(cellMap, 0).trim();
+          const codCli = getCellValue(cellMap, 1).trim();
+          const cliente = getCellValue(cellMap, 2).trim();
+          const total = parseFloat(getCellValue(cellMap, 3)) || 0;
+          const objetivo = parseFloat(getCellValue(cellMap, 4)) || 0;
+          const falta = objetivo - total;
           const resultadoPct = objetivo > 0 ? (total / objetivo) : 0;
 
-          // Se não tem dados, pular
+          // Skip linhas TOTAL
+          if (cliente.includes('TOTAL') || cliente.includes('total')) return;
+
+          // Skip se não tem UF e cliente (linha vazia)
           if (!uf && !cliente) return;
 
-          // Skip TOTAL rows
-          if (cliente.includes('TOTAL')) return;
+          // ═══════════════════════════════════════════════════════════
+          // TODOS OS CLIENTES VÃO PARA O GRUPO PERÍODO-ESPECÍFICO
+          // NÃO criar grupos separados por "- Agrupador"
+          // ═══════════════════════════════════════════════════════════
+          if (cliente) {
+            // Verificar se tem Código Agrupador (lido da 2ª aba)
+            const temAgrupador = codigoAgrupadorMap[codCli];
+            let grupoDestino;
 
-          // REGRA: APENAS se tem "- Agrupador" no nome → É um AGRUPADOR
-          const isAgrupador = cliente.includes('- Agrupador');
+            if (temAgrupador) {
+              // Cliente com agrupador - criar/usar grupo com esse código
+              grupoDestino = secaoAtual.grupos.find(g => g.codCli === codCli);
 
-          if (isAgrupador) {
-            // Salvar grupo anterior se existir
-            if (currentGrupo) {
-              dados.grupos.push(currentGrupo);
+              if (!grupoDestino) {
+                grupoDestino = {
+                  nome: temAgrupador,
+                  uf: uf,
+                  codCli: codCli,
+                  total: 0,
+                  objetivo: 0,
+                  falta: 0,
+                  resultadoPct: 0,
+                  periodo: secaoAtual.periodo,
+                  clientes: []
+                };
+                secaoAtual.grupos.push(grupoDestino);
+              }
+            } else {
+              // Cliente sem agrupador - ir para CLIENTE TRIMESTRAIS/SEMESTRAIS
+              const nomeGrupo = secaoAtual.periodo === 'SEMESTRAL' ? 'CLIENTE SEMESTRAIS' : 'CLIENTE TRIMESTRAIS';
+              grupoDestino = secaoAtual.grupos.find(g => g.codCli === '0000');
+
+              if (!grupoDestino) {
+                grupoDestino = {
+                  nome: nomeGrupo,
+                  uf: 'XX',
+                  codCli: '0000',
+                  total: 0,
+                  objetivo: 0,
+                  falta: 0,
+                  resultadoPct: 0,
+                  periodo: secaoAtual.periodo,
+                  clientes: []
+                };
+                secaoAtual.grupos.push(grupoDestino);
+              }
             }
 
-            // Criar novo agrupador
-            currentGrupo = {
-              nome: cliente,
-              uf: uf,
-              codCli: codCli,
-              total: total,
-              objetivo: objetivo,
-              falta: falta,
-              resultadoPct: resultadoPct,
-              clientes: []
-            };
-          } else if (cliente && currentGrupo) {
-            // Cliente individual sob um agrupador
-            currentGrupo.clientes.push({
+            // Adicionar cliente ao grupo
+            grupoDestino.clientes.push({
               uf: uf,
               codCli: codCli,
               cliente: cliente,
               total: total,
               objetivo: objetivo,
               falta: falta,
-              resultadoPct: resultadoPct
+              resultadoPct: resultadoPct,
+              periodo: secaoAtual.periodo
             });
+
+            // Atualizar totais do grupo
+            grupoDestino.total += total;
+            grupoDestino.objetivo += objetivo;
+            grupoDestino.falta = grupoDestino.objetivo - grupoDestino.total;
+            grupoDestino.resultadoPct = grupoDestino.objetivo > 0
+              ? grupoDestino.total / grupoDestino.objetivo
+              : 0;
           }
         });
 
-        // Adicionar último grupo se existir
-        if (currentGrupo) {
-          dados.grupos.push(currentGrupo);
+        // Salvar última seção
+        if (secaoAtual) {
+          secoes.push(secaoAtual);
         }
 
-        resolve(dados);
+        // ═══════════════════════════════════════════════════════════
+        // RETORNAR TODAS AS SEÇÕES (cada uma será um período diferente)
+        // ═══════════════════════════════════════════════════════════
+        if (secoes.length === 0) {
+          throw new Error('Nenhum dado encontrado no arquivo');
+        }
+
+        // Retornar array de seções
+        // O importPlanoExcel() processará cada seção
+        resolve(secoes);
+
       } catch (err) {
         console.error('Erro ao parsear Plano:', err);
         reject(err);
@@ -3820,6 +4031,10 @@ async function parsePlanoPlanilha(file){
     reader.readAsArrayBuffer(file);
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NOVA FUNÇÃO: Processar múltiplas seções
+// ═══════════════════════════════════════════════════════════════════════════════
 
 async function importPlanoExcel(event){
   const files = event.target.files;
@@ -3833,52 +4048,71 @@ async function importPlanoExcel(event){
 
     for (let file of fileList) {
       try {
-        const dadosPlano = await parsePlanoPlanilha(file);
+        const secoes = await parsePlanoPlanilha(file); // Retorna ARRAY de seções
 
-        if (!dadosPlano.representante) {
-          dadosPlano.representante = prompt(`Qual é o representante para "${file.name}"?`) || 'SEM REP';
+        for (let secao of secoes) {
+          // Cada seção é um período diferente
+          const dadosPlano = {
+            representante: secao.representante,
+            periodo: secao.periodo,
+            periodoNum: secao.periodoNum,
+            trimestre: secao.periodoNum, // compatibilidade
+            grupos: secao.grupos
+          };
+
+          if (!dadosPlano.representante) {
+            dadosPlano.representante = prompt(`Qual é o representante para "${file.name}"?`) || 'SEM REP';
+          }
+
+          if (!dadosPlano.periodoNum) {
+            dadosPlano.periodoNum = prompt(`Qual período para "${file.name}"? (1-4)`) || '3';
+            dadosPlano.trimestre = dadosPlano.periodoNum;
+          }
+
+          if (!PLANO_BY_REP[dadosPlano.representante]) {
+            PLANO_BY_REP[dadosPlano.representante] = [];
+          }
+
+          // Verificar se já existe este período e remover
+          PLANO_BY_REP[dadosPlano.representante] =
+            PLANO_BY_REP[dadosPlano.representante].filter(p =>
+              !(p.periodoNum === dadosPlano.periodoNum && p.periodo === dadosPlano.periodo)
+            );
+
+          PLANO_BY_REP[dadosPlano.representante].push(dadosPlano);
+          successCount++;
+
+          console.log(`✓ Importado: ${dadosPlano.representante} - ${dadosPlano.periodo} ${dadosPlano.periodoNum}`);
         }
-
-        if (!dadosPlano.trimestre) {
-          dadosPlano.trimestre = prompt(`Qual trimestre para "${file.name}"? (1-4)`) || '3';
-        }
-
-        if (!PLANO_BY_REP[dadosPlano.representante]) {
-          PLANO_BY_REP[dadosPlano.representante] = [];
-        }
-
-        // Verificar se já existe este trimestre e remover
-        PLANO_BY_REP[dadosPlano.representante] =
-          PLANO_BY_REP[dadosPlano.representante].filter(p => p.trimestre !== dadosPlano.trimestre);
-
-        PLANO_BY_REP[dadosPlano.representante].push(dadosPlano);
-        successCount++;
       } catch (err) {
-        console.error(`Erro ao processar ${file.name}:`, err);
+        console.error(`Erro ao importar ${file.name}:`, err);
       }
     }
 
     savePlanoByRep();
 
-    if (successCount > 0) {
-      $('plano-import-status').innerHTML = `✅ ${successCount} arquivo(s) importado(s) com sucesso!`;
-      refreshPlanoDisplay();
-
-      setTimeout(() => {
-        $('plano-import-area').style.display = 'none';
-        $('plano-results').style.display = 'block';
-        $('plano-rep-bar').style.display = 'flex';
-      }, 500);
-    } else {
-      $('plano-import-status').textContent = '❌ Nenhum arquivo foi processado corretamente.';
+    // Atualizar interface
+    const repSelect = $('plano-rep-select');
+    if (repSelect) {
+      const reps = Object.keys(PLANO_BY_REP).sort();
+      repSelect.innerHTML = '<option value="">Todos os Representantes</option>';
+      reps.forEach(rep => {
+        const opt = document.createElement('option');
+        opt.value = rep;
+        opt.textContent = rep;
+        repSelect.appendChild(opt);
+      });
     }
 
+    $('plano-import-area').style.display = 'none';
+    $('plano-results').style.display = 'block';
+    $('plano-rep-bar').style.display = 'flex';
+    $('plano-import-status').textContent = `✓ ${successCount} período(s) importado(s) com sucesso!`;
+
+    applyPlanoFilter();
   } catch (err) {
-    console.error('Erro geral ao importar:', err);
     $('plano-import-status').textContent = '❌ Erro ao importar: ' + err.message;
   }
-
-  event.target.value = '';
 }
 
 function refreshPlanoDisplay(){
@@ -3971,38 +4205,109 @@ function renderPlanoTable(dados){
 
   tbody.innerHTML = '';
 
-  let grupoIndex = 0;
   let totalObjetivo = 0;
   let totalFaturado = 0;
   let totalFalta = 0;
+  let periodoIndex = 0;
+  let grupoIndex = 0;
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // ESTRATÉGIA: Agrupar por PERÍODO primeiro (TRIMESTRAL, SEMESTRAL)
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  // Criar mapa: período -> codCli -> grupo consolidado
+  const periodoMap = {};
 
   dados.forEach(plano => {
-    // Renderizar agrupadores e clientes
     plano.grupos.forEach(grupo => {
+      const periodoKey = grupo.periodo; // Ex: TRIMESTRAL ou SEMESTRAL
+      const codCliKey = grupo.codCli;
+
+      if (!periodoMap[periodoKey]) {
+        periodoMap[periodoKey] = {};
+      }
+
+      if (!periodoMap[periodoKey][codCliKey]) {
+        // Primeira vez vendo este codCli neste período
+        periodoMap[periodoKey][codCliKey] = {
+          ...grupo,
+          clientes: [...grupo.clientes]
+        };
+      } else {
+        // Já existe este codCli neste período, consolidar
+        const existing = periodoMap[periodoKey][codCliKey];
+        existing.total += grupo.total;
+        existing.objetivo += grupo.objetivo;
+        existing.falta = existing.objetivo - existing.total;
+        existing.resultadoPct = existing.objetivo > 0 ? (existing.total / existing.objetivo) : 0;
+
+        // Adicionar clientes do grupo atual
+        existing.clientes.push(...grupo.clientes);
+      }
+    });
+  });
+
+  // Ordenar períodos (TRIMESTRAL antes de SEMESTRAL)
+  const periodos = Object.keys(periodoMap).sort((a, b) => {
+    const aIsTrimestral = a.includes('TRIMESTRAL');
+    const bIsTrimestral = b.includes('TRIMESTRAL');
+    return aIsTrimestral ? -1 : 1;
+  });
+
+  // Renderizar cada período como seção colapsível
+  periodos.forEach(periodoKey => {
+    periodoIndex++;
+    const gruposMap = periodoMap[periodoKey]; // Agora é um objeto { codCli -> grupo }
+    const grupos = Object.values(gruposMap).sort((a, b) => parseInt(a.codCli) - parseInt(b.codCli));
+    const periodoLabel = periodoKey === 'SEMESTRAL' ? 'CLIENTES SEMESTRAL' : 'CLIENTES TRIMESTRAL';
+    const periodoData = grupos[0];
+
+    // Calcular totais do período
+    let periodTotalObjetivo = 0;
+    let periodTotalFaturado = 0;
+    let periodTotalFalta = 0;
+
+    grupos.forEach(grupo => {
+      periodTotalObjetivo += grupo.objetivo;
+      periodTotalFaturado += grupo.total;
+      periodTotalFalta += grupo.falta;
+
+      grupo.clientes.forEach(cli => {
+        periodTotalObjetivo += cli.objetivo;
+        periodTotalFaturado += cli.total;
+        periodTotalFalta += cli.falta;
+      });
+    });
+
+    const periodResultado = periodTotalObjetivo > 0 ? (periodTotalFaturado / periodTotalObjetivo) : 0;
+
+    // NÃO renderizar header de período - vai direto para os grupos!
+
+    // Renderizar agrupadores dentro do período
+    grupos.forEach(grupo => {
       grupoIndex++;
       const currentGrupoIndex = grupoIndex;
 
-      // Acumular totais do agrupador
       totalObjetivo += grupo.objetivo;
       totalFaturado += grupo.total;
       totalFalta += grupo.falta;
 
-      // Acumular totais dos clientes
       grupo.clientes.forEach(cli => {
         totalObjetivo += cli.objetivo;
         totalFaturado += cli.total;
         totalFalta += cli.falta;
       });
 
-      // Linha do agrupador
+      // Linha do AGRUPADOR
       const grupoRow = document.createElement('tr');
       grupoRow.style.background = '#f9f9f9';
       grupoRow.style.fontWeight = 'bold';
       grupoRow.style.cursor = 'pointer';
-      grupoRow.className = 'grupo-header';
+      grupoRow.setAttribute('data-periodo-grupo', periodoIndex);
       grupoRow.setAttribute('data-grupo', currentGrupoIndex);
+
       grupoRow.innerHTML = `
-        <td style="padding-left:14px;"><span style="margin-right:8px;">▼</span>${grupo.uf}</td>
+        <td style="padding-left:28px;"><span style="margin-right:8px;">▶</span></td>
         <td>${grupo.codCli}</td>
         <td>${grupo.nome}</td>
         <td style="text-align:right;">${formatMoney(grupo.total)}</td>
@@ -4012,31 +4317,31 @@ function renderPlanoTable(dados){
       `;
 
       grupoRow.addEventListener('click', function(e) {
+        e.stopPropagation();
         const isExpanded = this.getAttribute('data-expanded') === 'true';
         const icon = this.querySelector('span');
 
-        // Toggle estado
         this.setAttribute('data-expanded', !isExpanded);
         icon.textContent = isExpanded ? '▶' : '▼';
 
         // Mostrar/ocultar clientes deste grupo
         const clientRows = tbody.querySelectorAll(`tr[data-cliente-grupo="${currentGrupoIndex}"]`);
-        clientRows.forEach(row => {
-          row.style.display = isExpanded ? 'none' : 'table-row';
-        });
+        clientRows.forEach(row => row.style.display = isExpanded ? 'none' : 'table-row');
       });
 
       grupoRow.setAttribute('data-expanded', 'false');
-      grupoRow.querySelector('span').textContent = '▶';
       tbody.appendChild(grupoRow);
 
-      // Linhas dos clientes
+      // Linhas dos CLIENTES dentro do agrupador
       grupo.clientes.forEach(cli => {
         const cliRow = document.createElement('tr');
+        cliRow.setAttribute('data-periodo-cliente', periodoIndex);
         cliRow.setAttribute('data-cliente-grupo', currentGrupoIndex);
         cliRow.style.display = 'none';
+        cliRow.style.paddingLeft = '42px';
+
         cliRow.innerHTML = `
-          <td style="padding-left:28px;">${cli.uf}</td>
+          <td style="padding-left:42px;"></td>
           <td>${cli.codCli}</td>
           <td>${cli.cliente}</td>
           <td style="text-align:right;">${formatMoney(cli.total)}</td>
@@ -4059,13 +4364,66 @@ function renderPlanoTable(dados){
   totalRow.innerHTML = `
     <td style="padding-left:14px;">—</td>
     <td>—</td>
-    <td style="text-align:left;">TOTAL GERAL</td>
+    <td style="text-align:left;"><strong>TOTAL GERAL</strong></td>
     <td style="text-align:right;">${formatMoney(totalFaturado)}</td>
     <td style="text-align:right;">${formatMoney(totalObjetivo)}</td>
     <td style="text-align:right;">${formatMoney(totalFalta)}</td>
-    <td style="text-align:right;">${(resultadoPctTotal * 100).toFixed(1)}%</td>
+    <td style="text-align:right;"><strong>${(resultadoPctTotal * 100).toFixed(1)}%</strong></td>
   `;
   tbody.appendChild(totalRow);
+
+  // Atualizar painel de resumo (.htotal no header)
+  const resultadoPctTotalStr = (resultadoPctTotal * 100).toFixed(1);
+  const totalFaturadoEl = $('plano-htotal-faturado');
+  const totalObjetivoEl = $('plano-htotal-objetivo');
+  const totalFaltaEl = $('plano-htotal-falta');
+  const totalPctEl = $('plano-htotal-pct');
+
+  if (totalFaturadoEl) totalFaturadoEl.textContent = formatMoney(totalFaturado);
+  if (totalObjetivoEl) totalObjetivoEl.textContent = formatMoney(totalObjetivo);
+  if (totalFaltaEl) totalFaltaEl.textContent = formatMoney(totalFalta);
+  if (totalPctEl) totalPctEl.textContent = resultadoPctTotalStr + '%';
+
+  // Atualizar painel de resumo da direita (se existir)
+  const oldTotalFaturadoEl = $('plano-total-faturado');
+  const oldTotalObjetivoEl = $('plano-total-objetivo');
+  const oldTotalFaltaEl = $('plano-total-falta');
+  const oldTotalPctEl = $('plano-total-pct');
+
+  if (oldTotalFaturadoEl) oldTotalFaturadoEl.textContent = formatMoney(totalFaturado);
+  if (oldTotalObjetivoEl) oldTotalObjetivoEl.textContent = formatMoney(totalObjetivo);
+  if (oldTotalFaltaEl) oldTotalFaltaEl.textContent = formatMoney(totalFalta);
+  if (oldTotalPctEl) oldTotalPctEl.textContent = resultadoPctTotalStr + '%';
+}
+
+function copyPlanoLink(){
+  const repSelect = $('plano-rep-select');
+  const trimestreFilter = $('plano-trimestre-filter');
+  const selectedRep = repSelect ? repSelect.value : '';
+  const selectedTrimestre = trimestreFilter ? trimestreFilter.value : '';
+
+  // Gerar parâmetros de URL
+  const params = new URLSearchParams();
+  params.set('view', 'plano');
+  if (selectedRep) params.set('rep', encodeURIComponent(selectedRep));
+  if (selectedTrimestre) params.set('trim', selectedTrimestre);
+
+  // URL compartilhável
+  const baseUrl = window.location.origin + window.location.pathname;
+  const shareUrl = baseUrl + '?' + params.toString();
+
+  // Copiar para clipboard
+  navigator.clipboard.writeText(shareUrl).then(() => {
+    const statusEl = $('plano-link-status');
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      setTimeout(() => {
+        statusEl.style.display = 'none';
+      }, 2000);
+    }
+  }).catch(err => {
+    alert('Link: ' + shareUrl);
+  });
 }
 
 function exportPlanoPDF(){
@@ -4651,6 +5009,32 @@ async function initDashboard() {
   // 5. Link da nuvem que não carregou → avisa
   if(window.__shareLoadError){
     setTimeout(()=>{ alert('⚠️ Não foi possível carregar os dados deste link.\nPode ser falta de internet ou o link expirou. Peça um link novo.'); }, 300);
+  }
+
+  // 6. Abrir aba Plano se tiver parâmetro view=plano
+  const viewParam = urlParams.get('view');
+  const repParam = urlParams.get('rep');
+  const trimParam = urlParams.get('trim');
+
+  if(viewParam === 'plano') {
+    setTimeout(() => {
+      // Abrir aba Plano
+      const planoTab = Array.from(document.querySelectorAll('.tab')).find(t => t.textContent.includes('Plano de Negócio'));
+      if(planoTab) planoTab.click();
+
+      // Aplicar filtros se houver
+      if(repParam) {
+        const repSelect = $('plano-rep-select');
+        if(repSelect) repSelect.value = decodeURIComponent(repParam);
+      }
+      if(trimParam) {
+        const trimSelect = $('plano-trimestre-filter');
+        if(trimSelect) trimSelect.value = trimParam;
+      }
+
+      // Aplicar filtro
+      applyPlanoFilter();
+    }, 100);
   }
 }
 
