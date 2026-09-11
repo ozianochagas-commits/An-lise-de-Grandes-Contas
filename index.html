@@ -5025,7 +5025,7 @@ async function empacotarLink(payload, repLabel){
   try{
     const comp = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
     const longLink = base + '#d=' + comp;
-    const tinyResp = await fetch('https://tinyurl.com/api/create.php?url=' + encodeURIComponent(longLink));
+    const tinyResp = await fetch('https://tinyurl.com/api-create.php?url=' + encodeURIComponent(longLink));
     if(tinyResp.ok){
       const tinyUrl = await tinyResp.text();
       if(tinyUrl && tinyUrl.indexOf('tinyurl') > -1){
@@ -5094,7 +5094,7 @@ async function empacotarLinkPorRep(payload, repLabel){
   try{
     const comp = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
     const longLink = base + '#d=' + comp;
-    const tinyResp = await fetch('https://tinyurl.com/api/create.php?url=' + encodeURIComponent(longLink));
+    const tinyResp = await fetch('https://tinyurl.com/api-create.php?url=' + encodeURIComponent(longLink));
     if(tinyResp.ok){
       const tinyUrl = await tinyResp.text();
       if(tinyUrl && tinyUrl.indexOf('tinyurl') > -1){
