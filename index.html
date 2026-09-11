@@ -789,6 +789,21 @@
   </div>
 </div>
 
+<!-- MODAL DE ORIGEM DUPLICADA — PLANO DE NEGÓCIO -->
+<div class="modal-overlay" id="modal-plano-duplicado">
+  <div class="modal-content" style="max-width:480px;">
+    <div class="modal-header"><span>⚠️ Arquivo já importado</span></div>
+    <div class="modal-body">
+      <p id="plano-duplicado-texto" style="font-size:13px;color:#444;line-height:1.7;margin:0;"></p>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:6px;">
+        <button class="btn-modal-save" style="background:var(--orange);" onclick="resolverDuplicidadePlano('somar')">➕ Somar novamente (duplicar os valores)</button>
+        <button class="btn-modal-save" style="background:var(--dark);" onclick="resolverDuplicidadePlano('substituir')">🔄 Substituir esta origem</button>
+        <button class="btn-modal-save" style="background:#999;" onclick="resolverDuplicidadePlano('cancelar')">✕ Cancelar esta planilha</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- PDF REP HEADER (visible only on print) -->
 <div id="pdf-rep-header" class="pdf-rep-header"></div>
 
@@ -3791,7 +3806,29 @@ function mergePlanoGrupos(existentes = [], novos = []) {
   return Array.from(map.values());
 }
 
-function acumularPlanoImportado(dadosPlano) {
+// ── DETECÇÃO DE ORIGEM JÁ IMPORTADA ─────────────────────────────────────────
+// Identifica um arquivo pelo nome + tamanho + data de modificação, para
+// reconhecer quando o mesmo Excel está sendo importado de novo no mesmo
+// representante/período (e então perguntar ao usuário o que fazer).
+function origemArquivoKey(file) {
+  return `${String(file?.name || '').trim().toUpperCase()}::${file?.size ?? ''}::${file?.lastModified ?? ''}`;
+}
+
+function encontrarOrigemDuplicada(representante, periodo, periodoNum, origemKey) {
+  const rep = normalizePlanoRep(representante);
+  const periodoNorm = String(periodo || 'TRIMESTRAL').toUpperCase();
+  const periodoNumNorm = String(periodoNum || '');
+
+  const plano = (PLANO_BY_REP[rep] || []).find(p =>
+    String(p.periodo || '').toUpperCase() === periodoNorm &&
+    String(p.periodoNum || '') === periodoNumNorm
+  );
+
+  if (!plano || !plano.origens) return null;
+  return plano.origens.find(o => o.key === origemKey) || null;
+}
+
+function acumularPlanoImportado(dadosPlano, origemInfo = null, acaoDuplicidade = 'somar') {
   const rep = normalizePlanoRep(dadosPlano.representante);
   const periodo = String(dadosPlano.periodo || 'TRIMESTRAL').toUpperCase();
   const periodoNum = String(dadosPlano.periodoNum || '');
@@ -3808,15 +3845,27 @@ function acumularPlanoImportado(dadosPlano) {
     String(p.periodoNum || '') === periodoNum
   );
 
+  const gruposImportados = (dadosPlano.grupos || []).map(g => ({
+    ...g,
+    clientes: (g.clientes || []).map(c => ({ ...c }))
+  }));
+
+  const origemEntry = origemInfo ? {
+    key: origemInfo.key,
+    nome: origemInfo.nome,
+    tamanho: origemInfo.tamanho,
+    modificado: origemInfo.modificado,
+    importadoEm: new Date().toISOString(),
+    grupos: gruposImportados
+  } : null;
+
   if (idx < 0) {
     PLANO_BY_REP[rep].push({
       ...dadosPlano,
-      grupos: (dadosPlano.grupos || []).map(g => ({
-        ...g,
-        clientes: (g.clientes || []).map(c => ({ ...c }))
-      }))
+      grupos: gruposImportados,
+      origens: origemEntry ? [origemEntry] : []
     });
-    return { acumulado: false, representante: rep, periodo, periodoNum };
+    return { acumulado: false, substituido: false, representante: rep, periodo, periodoNum };
   }
 
   const existente = PLANO_BY_REP[rep][idx];
@@ -3824,9 +3873,51 @@ function acumularPlanoImportado(dadosPlano) {
   existente.periodo = periodo;
   existente.periodoNum = periodoNum;
   existente.trimestre = periodo === 'TRIMESTRAL' ? periodoNum : '';
-  existente.grupos = mergePlanoGrupos(existente.grupos || [], dadosPlano.grupos || []);
+  if (!existente.origens) existente.origens = [];
 
-  return { acumulado: true, representante: rep, periodo, periodoNum };
+  if (!origemEntry) {
+    // Chamada sem rastreio de origem (ex.: migração de dados antigos):
+    // mantém o comportamento anterior de somar diretamente.
+    existente.grupos = mergePlanoGrupos(existente.grupos || [], gruposImportados);
+    return { acumulado: true, substituido: false, representante: rep, periodo, periodoNum };
+  }
+
+  const substituido = acaoDuplicidade === 'substituir';
+  if (substituido) {
+    existente.origens = existente.origens.filter(o => o.key !== origemEntry.key);
+  }
+  existente.origens.push(origemEntry);
+
+  // Recalcula o total do período somando cada origem — isso permite
+  // substituir uma origem específica sem duplicar o restante.
+  existente.grupos = existente.origens.reduce(
+    (acc, o) => mergePlanoGrupos(acc, o.grupos || []),
+    []
+  );
+
+  return { acumulado: true, substituido, representante: rep, periodo, periodoNum };
+}
+
+// ── MODAL: "Somar novamente ou substituir esta origem?" ────────────────────
+let __resolverDuplicidadePlano = null;
+
+function perguntarAcaoDuplicidade({ arquivo, representante, periodo, periodoNum }) {
+  const label = periodo === 'SEMESTRAL' ? `${periodoNum}º Semestre` : `${periodoNum}º Trimestre`;
+  const texto = `O arquivo "${arquivo}" já foi importado para <strong>${representante}</strong> — ${label}.<br><br>Deseja somar novamente (duplicando os valores) ou substituir os dados desta origem?`;
+  $('plano-duplicado-texto').innerHTML = texto;
+  $('modal-plano-duplicado').classList.add('show');
+
+  return new Promise(resolve => {
+    __resolverDuplicidadePlano = resolve;
+  });
+}
+
+function resolverDuplicidadePlano(acao) {
+  $('modal-plano-duplicado').classList.remove('show');
+  if (__resolverDuplicidadePlano) {
+    __resolverDuplicidadePlano(acao);
+    __resolverDuplicidadePlano = null;
+  }
 }
 
 // Migra em memória nomes antigos (ex.: "ATIVA REPRESENTAÇÕES") para a mesma
@@ -5003,13 +5094,42 @@ async function importPlanoExcel(event){
           console.log(`  - Representante: "${dadosPlano.representante}"`);
           console.log(`  - É número? ${isNaN(dadosPlano.representante)}`);
 
-          // IMPORTANTE: o novo Excel SOMA ao período já existente.
-          // Não removemos mais o período anterior.
-          const resultadoAcumulo = acumularPlanoImportado(dadosPlano);
+          // Reconhece se este MESMO arquivo (nome + tamanho + data de
+          // modificação) já foi importado para este representante/período.
+          // Se sim, pergunta ao usuário o que fazer em vez de somar direto.
+          const origemKey = origemArquivoKey(file);
+          const jaImportado = encontrarOrigemDuplicada(
+            dadosPlano.representante, dadosPlano.periodo, dadosPlano.periodoNum, origemKey
+          );
+
+          let acaoDuplicidade = 'somar';
+          if (jaImportado) {
+            console.log(`⚠️  Origem já importada anteriormente: "${file.name}"`);
+            acaoDuplicidade = await perguntarAcaoDuplicidade({
+              arquivo: file.name,
+              representante: dadosPlano.representante,
+              periodo: dadosPlano.periodo,
+              periodoNum: dadosPlano.periodoNum
+            });
+
+            if (acaoDuplicidade === 'cancelar') {
+              console.log(`⏭️  Importação de "${file.name}" cancelada pelo usuário (origem duplicada).`);
+              continue;
+            }
+          }
+
+          // IMPORTANTE: o novo Excel SOMA ao período já existente, a menos
+          // que o usuário escolha substituir os dados desta mesma origem.
+          const resultadoAcumulo = acumularPlanoImportado(dadosPlano, {
+            key: origemKey,
+            nome: file.name,
+            tamanho: file.size,
+            modificado: file.lastModified
+          }, acaoDuplicidade);
           successCount++;
 
           console.log(
-            `${resultadoAcumulo.acumulado ? '➕ Somado' : '✅ Importado'}: ` +
+            `${resultadoAcumulo.substituido ? '🔄 Substituído' : (resultadoAcumulo.acumulado ? '➕ Somado' : '✅ Importado')}: ` +
             `${resultadoAcumulo.representante} - ${resultadoAcumulo.periodo} ${resultadoAcumulo.periodoNum}`
           );
         }
