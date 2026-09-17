@@ -746,19 +746,44 @@
       .from('clientes').select('*').in('dados_mensais_id', dm.map(r => r.id));
     if (e2) return false;
 
-    BASE.forEach((_, i) => { CLIENTS[i] = []; });
+    // Agrupa o que veio do Supabase, por representante.
+    const porRepIdx = {};
     (cli || []).forEach(c => {
       const repId = dmIdParaRepId[c.dados_mensais_id];
       const nome = nomePorId[repId];
-      const repIdx = BASE.findIndex(b => b.name === nome);
+      const repIdx = (typeof BASE !== 'undefined') ? BASE.findIndex(b => b.name === nome) : -1;
       if (repIdx < 0) return;
-      CLIENTS[repIdx].push({
+      if (!porRepIdx[repIdx]) porRepIdx[repIdx] = [];
+      porRepIdx[repIdx].push({
         name: c.nome_cliente,
         value: Number(c.valor) || 0,
         real: Number(c.valor_realizado) || 0,
         selected: c.status === 'confirmado'
       });
     });
+
+    // IMPORTANTE: se o Supabase ainda não tem NENHUM cliente para um
+    // representante (ex.: primeira vez que esta sincronização roda, e
+    // ninguém editou nada desse representante ainda), NÃO apaga o que já
+    // estava salvo no navegador — preserva o que tem localmente e agenda
+    // o envio dele para a nuvem, para não perder de novo da próxima vez.
+    const local = (typeof lerClientesLocalStorage === 'function') ? lerClientesLocalStorage() : {};
+    let precisaMigrar = false;
+    BASE.forEach((_, i) => {
+      if (porRepIdx[i] && porRepIdx[i].length) {
+        CLIENTS[i] = porRepIdx[i];
+      } else if (local[i] && local[i].length) {
+        CLIENTS[i] = local[i];
+        precisaMigrar = true;
+      } else {
+        CLIENTS[i] = [];
+      }
+    });
+
+    if (precisaMigrar && typeof agendarSyncDadosMensais === 'function') {
+      agendarSyncDadosMensais(mes);
+    }
+
     return true;
   }
 
@@ -1943,12 +1968,33 @@ function saveClientsData(){
   }catch(e){}
 }
 
+// Lê os clientes salvos no localStorage do mês atual SEM mexer em CLIENTS —
+// usada para comparar com o que veio do Supabase antes de decidir o que exibir.
+function lerClientesLocalStorage(){
+  const data = {};
+  try{
+    const raw = localStorage.getItem('riosulense_clients_'+currentMonth);
+    if(!raw) return data;
+    const parsed = JSON.parse(raw);
+    Object.keys(parsed).forEach(idx => {
+      const arr = Array.isArray(parsed[idx]) ? parsed[idx] : [];
+      data[idx] = arr.map(c => ({
+        name: c.name,
+        value: typeof c.value === 'number' ? c.value : toNumber(c.value),
+        real: toNumber(c.real),
+        selected: c.selected === true
+      }));
+    });
+  }catch(e){}
+  return data;
+}
+
 function loadClientsData(){
   // Primeiro, reinicializa CLIENTS para esse mês
   BASE.forEach((_, i) => {
     if(!CLIENTS[i]) CLIENTS[i] = [];
   });
-  
+
   try{
     const raw = localStorage.getItem('riosulense_clients_'+currentMonth);
     if(!raw) return;
@@ -2773,75 +2819,55 @@ function changeMonth(){
   if(hdrMonth) hdrMonth.textContent = monthNames[newMonth];
   updateInativMesNome();
 
-  // 6. Renderiza inputs (agora com valores padrão de BASE)
+  // 6. Renderiza inputs (agora com valores padrão de BASE) e carrega o que
+  //    já estiver salvo neste navegador para o mês novo — SEMPRE, como base,
+  //    para nunca depender só do Supabase respondendo a tempo.
   renderEditTable();
+  loadData();
+  loadClientsData();
 
-  // 7. SALVAR valores padrão ANTES de tentar carregar Supabase
-  const baseDefault = BASE.map(r => ({
-    name: r.name,
-    meta: r.meta,
-    real: r.real,
-    prev: r.prev,
-    car: r.car
-  }));
-
-  // 8. FORÇAR RECARREGAR DO SUPABASE (com cache bypass)
+  // 7. Busca no Supabase os dados mais recentes deste mês. Atualiza BASE e
+  //    os inputs JÁ RENDERIZADOS diretamente, representante por
+  //    representante — NUNCA substitui o array BASE inteiro (isso descartava
+  //    quem o Supabase não retornasse) nem chama renderEditTable() de novo
+  //    (ela relê os inputs de volta para BASE antes de reconstruir, o que
+  //    apagaria o valor recém-carregado).
   const mesSupabase = newMonth + '-01';
-  const cacheBypass = `&t=${Date.now()}`; // força recarregar, não usa cache
-
   console.log('🔄 Tentando carregar dados para:', mesSupabase);
 
-  // Carregar DO SUPABASE COM PRIORIDADE ABSOLUTA
   carregarDadosSupabase(mesSupabase).then(dadosSupabase => {
-    console.log('📡 Resposta Supabase:', dadosSupabase);
-
-    if (dadosSupabase && dadosSupabase.length > 0) {
-      const baseAtualizado = mapearDadosSupabase(dadosSupabase);
-      if (baseAtualizado && baseAtualizado.length > 0) {
-        // Limpar e atualizar BASE com dados do Supabase
-        BASE.length = 0;
-        BASE.push(...baseAtualizado);
-        console.log('✅ SUCESSO: Dados carregados do Supabase para', mesSupabase, 'Total:', baseAtualizado.length);
-      } else {
-        console.log('⚠️ Supabase retornou dados mas mapearDadosSupabase retornou vazio');
-        loadData(); // fallback para localStorage
-      }
+    const baseAtualizado = mapearDadosSupabase(dadosSupabase);
+    if (baseAtualizado && baseAtualizado.length){
+      baseAtualizado.forEach(rOnline=>{
+        const idx = BASE.findIndex(b => b.name === rOnline.name);
+        if(idx < 0) return;
+        BASE[idx].meta=rOnline.meta; BASE[idx].real=rOnline.real; BASE[idx].prev=rOnline.prev; BASE[idx].car=rOnline.car;
+        const mEl=$('i-meta-'+idx), rEl=$('i-real-'+idx), pEl=$('i-prev-'+idx), cEl=$('i-car-'+idx);
+        if(mEl) mEl.value = fmtN(rOnline.meta);
+        if(rEl) rEl.value = fmtN(rOnline.real);
+        if(pEl) pEl.value = fmtN(rOnline.prev);
+        if(cEl) cEl.value = fmtN(rOnline.car);
+      });
+      console.log('✅ Dados online aplicados para', mesSupabase, '— representantes:', baseAtualizado.length);
     } else {
-      console.log('⚠️ Supabase retornou vazio para', mesSupabase, '- usando localStorage');
-      loadData(); // fallback para localStorage
+      console.log('⚠️ Sem dados online para', mesSupabase, '— mantido o que já estava salvo neste navegador');
     }
-
-    // RENDERIZAR E RECALCULAR
-    renderEditTable();
-    recalc();
-    updateInativMesNome();
-    showNotification(`📅 ${monthNames[newMonth]}`);
   }).catch(error => {
-    console.error('❌ ERRO ao carregar Supabase:', error);
-    console.log('🔙 Fallback para localStorage');
-    loadData();
-    renderEditTable();
+    console.error('❌ ERRO ao carregar Supabase; mantido o que já estava salvo neste navegador:', error);
+  }).finally(() => {
     recalc();
     updateInativMesNome();
     showNotification(`📅 ${monthNames[newMonth]}`);
-  }).finally(() => {
-    // ✅ GARANTIR SINCRONIZAÇÃO FINAL DE TODOS OS DISPLAYS
     const selector = $('month-selector');
     const hdrMonth = $('hdr-month');
     if(selector) selector.value = currentMonth;
     if(hdrMonth) hdrMonth.textContent = monthNames[currentMonth];
   });
 
-  // Também carrega a relação de clientes do Cenário Comercial deste mês
-  // (em paralelo, sem bloquear); sem dados online, cai para o localStorage.
-  carregarClientesOnline(mesSupabase).then(carregou => {
-    if(!carregou) loadClientsData();
-    recalc();
-  }).catch(e => {
-    console.warn('⚠️ Erro ao carregar clientes online:', e);
-    loadClientsData();
-    recalc();
-  });
+  // Também busca a relação de clientes do Cenário Comercial deste mês
+  // (em paralelo, sem bloquear); já preserva o que for só local.
+  carregarClientesOnline(mesSupabase).then(() => { recalc(); })
+    .catch(e => { console.warn('⚠️ Erro ao carregar clientes online:', e); recalc(); });
 }
 
 function setAutoDate(){
@@ -6236,40 +6262,47 @@ async function initDashboard() {
   if(!shared){ currentTrimestre = getVigenteTrimestre(); }
   aplicarTrimestreUI(currentTrimestre);
 
+  renderEditTable();    // cria inputs com valores BASE (saveData bloqueado: _ready=false)
+  renderTrimTable();    // idem
+  loadData();           // SEMPRE parte do que está salvo neste navegador (nunca perde edição local)
+  loadClientsData();    // idem, para a relação de clientes do Cenário Comercial
+  loadDataTrim();       // restaura os valores do trimestre selecionado
+
   // 3.5. Busca no Supabase os dados mensais mais recentes (META/REALIZADO/
-  //      CENÁRIO/CARTEIRA), para qualquer pessoa que abra o dashboard ver
-  //      os MESMOS números — não só quem editou neste navegador.
+  //      CENÁRIO/CARTEIRA) e a relação de clientes do Cenário Comercial,
+  //      para qualquer pessoa que abra o dashboard ver os MESMOS números —
+  //      não só quem editou neste navegador. Só SOBRESCREVE um representante
+  //      quando o Supabase realmente tem dado para ele; quem ainda não foi
+  //      sincronizado (ex.: primeiro acesso após esta atualização) mantém o
+  //      que já estava salvo localmente, sem perder nada.
   //      Link compartilhado (shared) mantém o retrato que veio no link.
-  let carregouOnline = false;
   if(!shared){
     try{
       initSupabase();
       const dadosSupabase = await carregarDadosSupabase(currentMonth + '-01');
       const baseAtualizado = mapearDadosSupabase(dadosSupabase);
       if(baseAtualizado && baseAtualizado.length){
+        // Atualiza BASE e os inputs JÁ RENDERIZADOS diretamente — nunca chamar
+        // renderEditTable() de novo aqui, porque ela primeiro RELÊ os valores
+        // dos inputs de volta para BASE (para não perder o que o usuário está
+        // digitando), o que apagaria justamente o valor vindo do Supabase.
         baseAtualizado.forEach(rOnline=>{
-          const alvo = BASE.find(b => b.name === rOnline.name);
-          if(alvo){ alvo.meta=rOnline.meta; alvo.real=rOnline.real; alvo.prev=rOnline.prev; alvo.car=rOnline.car; }
+          const idx = BASE.findIndex(b => b.name === rOnline.name);
+          if(idx < 0) return;
+          BASE[idx].meta=rOnline.meta; BASE[idx].real=rOnline.real; BASE[idx].prev=rOnline.prev; BASE[idx].car=rOnline.car;
+          const mEl=$('i-meta-'+idx), rEl=$('i-real-'+idx), pEl=$('i-prev-'+idx), cEl=$('i-car-'+idx);
+          if(mEl) mEl.value = fmtN(rOnline.meta);
+          if(rEl) rEl.value = fmtN(rOnline.real);
+          if(pEl) pEl.value = fmtN(rOnline.prev);
+          if(cEl) cEl.value = fmtN(rOnline.car);
         });
-        carregouOnline = true;
       }
     }catch(e){ console.warn('⚠️ Não foi possível carregar os dados online; usando o que estiver salvo neste navegador.', e); }
-  }
 
-  // 3.6. Busca também a relação de clientes do Cenário Comercial (a lista
-  //      usada no tooltip/PDF) do Supabase; se não conseguir, usa o que
-  //      estiver salvo neste navegador.
-  let clientesOnline = false;
-  if(!shared){
-    try{ clientesOnline = await carregarClientesOnline(currentMonth + '-01'); }
+    try{ await carregarClientesOnline(currentMonth + '-01'); }
     catch(e){ console.warn('⚠️ Não foi possível carregar os clientes online.', e); }
   }
-  if(!clientesOnline) loadClientsData();
 
-  renderEditTable();    // cria inputs com valores BASE (saveData bloqueado: _ready=false)
-  renderTrimTable();    // idem
-  if(!carregouOnline) loadData(); // sem dados online: usa o que foi salvo neste navegador
-  loadDataTrim();       // restaura os valores do trimestre selecionado
   _ready = true;        // a partir daqui, saveData() pode gravar normalmente
   updateFilterText();   // atualiza o texto do filtro
   refreshInativForRep();// mostra a análise do representante atual
