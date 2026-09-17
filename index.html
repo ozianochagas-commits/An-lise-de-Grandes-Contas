@@ -658,16 +658,108 @@
     if (!rows.length) return { cloud: false, motivo: 'Nenhum representante reconhecido' };
 
     try {
-      const { error } = await window.supabaseClient
+      const { data: salvos, error } = await window.supabaseClient
         .from('dados_mensais')
-        .upsert(rows, { onConflict: 'representante_id,mes' });
+        .upsert(rows, { onConflict: 'representante_id,mes' })
+        .select('id,representante_id');
       if (error) throw error;
       console.log('✅ Dados mensais sincronizados com o Supabase para', mes);
+
+      // Com o id de cada linha salva, sobe também a relação de clientes
+      // do Cenário Comercial (a lista usada no PDF), ligada ao mês certo.
+      if (salvos && salvos.length) {
+        const dadosMensaisIdPorRepId = {};
+        salvos.forEach(s => { dadosMensaisIdPorRepId[s.representante_id] = s.id; });
+        await salvarClientesSupabase(dadosMensaisIdPorRepId, idsPorNome);
+      }
+
       return { cloud: true };
     } catch (err) {
       console.error('❌ Dados salvos localmente, mas o Supabase recusou a sincronização:', err);
       return { cloud: false, motivo: err?.message || String(err) };
     }
+  }
+
+  // Sobe a relação de clientes do Cenário Comercial (nome, valor, se está
+  // confirmado) para o Supabase, ligada ao registro do mês de cada
+  // representante. Substitui tudo que já existia para esse mês pela lista
+  // atual — mais simples e seguro do que tentar casar edição por edição.
+  async function salvarClientesSupabase(dadosMensaisIdPorRepId, idsPorNome) {
+    if (!window.supabaseClient) return { cloud: false };
+    const dmIds = Object.values(dadosMensaisIdPorRepId);
+    if (!dmIds.length) return { cloud: false };
+
+    try {
+      const { error: delError } = await window.supabaseClient
+        .from('clientes')
+        .delete()
+        .in('dados_mensais_id', dmIds);
+      if (delError) throw delError;
+
+      const rows = [];
+      BASE.forEach((rep, i) => {
+        const repId = idsPorNome[rep.name];
+        const dmId = repId !== undefined ? dadosMensaisIdPorRepId[repId] : undefined;
+        if (!dmId) return;
+        (CLIENTS[i] || []).forEach(c => {
+          rows.push({
+            dados_mensais_id: dmId,
+            representante_id: repId,
+            nome_cliente: c.name,
+            valor: toNumber(c.value),
+            valor_realizado: toNumber(c.real) || 0,
+            status: c.selected ? 'confirmado' : 'pendente'
+          });
+        });
+      });
+
+      if (rows.length) {
+        const { error: insError } = await window.supabaseClient.from('clientes').insert(rows);
+        if (insError) throw insError;
+      }
+      console.log('✅ Clientes do Cenário Comercial sincronizados com o Supabase');
+      return { cloud: true };
+    } catch (err) {
+      console.error('❌ Clientes salvos localmente, mas o Supabase recusou a sincronização:', err);
+      return { cloud: false, motivo: err?.message || String(err) };
+    }
+  }
+
+  // Busca do Supabase a relação de clientes do Cenário Comercial do mês
+  // atual e repõe o objeto CLIENTS (usado pelo tooltip e pelo PDF).
+  // Retorna true se conseguiu carregar do banco (mesmo que vazio).
+  async function carregarClientesOnline(mes) {
+    if (!window.supabaseClient) return false;
+    const idsPorNome = await obterRepresentanteIdPorNome();
+    if (!idsPorNome) return false;
+    const nomePorId = {};
+    Object.keys(idsPorNome).forEach(n => { nomePorId[idsPorNome[n]] = n; });
+
+    const { data: dm, error: e1 } = await window.supabaseClient
+      .from('dados_mensais').select('id,representante_id').eq('mes', mes);
+    if (e1 || !dm || !dm.length) return false;
+
+    const dmIdParaRepId = {};
+    dm.forEach(r => { dmIdParaRepId[r.id] = r.representante_id; });
+
+    const { data: cli, error: e2 } = await window.supabaseClient
+      .from('clientes').select('*').in('dados_mensais_id', dm.map(r => r.id));
+    if (e2) return false;
+
+    BASE.forEach((_, i) => { CLIENTS[i] = []; });
+    (cli || []).forEach(c => {
+      const repId = dmIdParaRepId[c.dados_mensais_id];
+      const nome = nomePorId[repId];
+      const repIdx = BASE.findIndex(b => b.name === nome);
+      if (repIdx < 0) return;
+      CLIENTS[repIdx].push({
+        name: c.nome_cliente,
+        value: Number(c.valor) || 0,
+        real: Number(c.valor_realizado) || 0,
+        selected: c.status === 'confirmado'
+      });
+    });
+    return true;
   }
 
   // Debounce: espera o usuário parar de digitar antes de gravar na nuvem,
@@ -676,40 +768,6 @@
   function agendarSyncDadosMensais(mes) {
     if (__syncDadosMensaisTimer) clearTimeout(__syncDadosMensaisTimer);
     __syncDadosMensaisTimer = setTimeout(() => { salvarDadosMensaisSupabase(mes); }, 900);
-  }
-
-  // Função global para buscar dados de clientes (incluindo inativos) do Supabase
-  async function carregarClientesSupabase(mes, representanteId = null) {
-    if (!window.supabaseClient) {
-      console.warn('⚠️ Supabase não inicializado');
-      return null;
-    }
-
-    try {
-      console.log('📊 Carregando clientes do Supabase para:', mes);
-
-      let query = window.supabaseClient
-        .from('clientes')
-        .select('*')
-        .eq('mes', mes);
-
-      if (representanteId) {
-        query = query.eq('representante_id', representanteId);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('❌ Erro ao buscar clientes:', error);
-        return null;
-      }
-
-      console.log('✅ Clientes carregados com sucesso:', data);
-      return data;
-    } catch (error) {
-      console.error('❌ Erro ao carregar clientes do Supabase:', error);
-      return null;
-    }
   }
 
   // Inicializar quando a página carregar
@@ -1716,6 +1774,7 @@ function setClientReal(clientIdx, raw){
   if(!client) return;
   client.real = toNumber(raw);
   saveClientsData();
+  saveData();
   renderClientsList();
 }
 
@@ -2773,12 +2832,16 @@ function changeMonth(){
     if(hdrMonth) hdrMonth.textContent = monthNames[currentMonth];
   });
 
-  // Também carregar clientes em paralelo (sem bloqueio)
-  carregarClientesSupabase(mesSupabase).then(clientes => {
-    if (clientes && clientes.length > 0) {
-      console.log('✅ Clientes carregados:', clientes.length);
-    }
-  }).catch(e => console.warn('⚠️ Erro ao carregar clientes:', e));
+  // Também carrega a relação de clientes do Cenário Comercial deste mês
+  // (em paralelo, sem bloquear); sem dados online, cai para o localStorage.
+  carregarClientesOnline(mesSupabase).then(carregou => {
+    if(!carregou) loadClientsData();
+    recalc();
+  }).catch(e => {
+    console.warn('⚠️ Erro ao carregar clientes online:', e);
+    loadClientsData();
+    recalc();
+  });
 }
 
 function setAutoDate(){
@@ -6166,7 +6229,6 @@ async function initDashboard() {
 
   // 3. Continua inicialização
   setAutoDate();
-  loadClientsData();    // carrega dados salvos de clientes da previsão
   if(!shared) loadInativByRep();  // carrega análise de grandes contas por representante
   if(!shared) await loadPlanoByRep();   // carrega plano de negócio por representante
   buildFilter();        // cria os checkboxes do dropdown
@@ -6193,6 +6255,16 @@ async function initDashboard() {
       }
     }catch(e){ console.warn('⚠️ Não foi possível carregar os dados online; usando o que estiver salvo neste navegador.', e); }
   }
+
+  // 3.6. Busca também a relação de clientes do Cenário Comercial (a lista
+  //      usada no tooltip/PDF) do Supabase; se não conseguir, usa o que
+  //      estiver salvo neste navegador.
+  let clientesOnline = false;
+  if(!shared){
+    try{ clientesOnline = await carregarClientesOnline(currentMonth + '-01'); }
+    catch(e){ console.warn('⚠️ Não foi possível carregar os clientes online.', e); }
+  }
+  if(!clientesOnline) loadClientsData();
 
   renderEditTable();    // cria inputs com valores BASE (saveData bloqueado: _ready=false)
   renderTrimTable();    // idem
