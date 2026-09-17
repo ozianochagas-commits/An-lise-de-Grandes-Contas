@@ -1831,8 +1831,8 @@ function exportPrevisaoPDF(){
     const v = toNumber(c.value);
     const p = toNumber(c.real);
     const reg = {n:c.name, v:v, p:p, g:p-v};
-    if(c.selected){ confirmados.push(reg); totConf += v; passConf += p; }
-    else          { aguardando.push(reg);  totAgu  += v; passAgu  += p; }
+    if(c.selected){ aguardando.push(reg);  totAgu  += v; passAgu  += p; }
+    else          { confirmados.push(reg); totConf += v; passConf += p; }
   });
 
   const totGeral  = totConf + totAgu;
