@@ -163,6 +163,16 @@
     /* cabeçalho do rep no PDF */
     .pdf-rep-header { display:block !important; padding:3px 8px !important;
                       font-size:8px !important; margin-bottom:3px !important; border-radius:3px !important; }
+
+    /* relação de clientes do Cenário Comercial (só aparece no PDF) */
+    .print-only-cenario { display:none; }
+    .page.print-target .print-only-cenario { display:block !important; margin-top:8px !important; }
+    .print-only-cenario .stitle { font-size:10px !important; padding:7px 10px !important; margin-bottom:6px !important; }
+    .cenario-block { page-break-inside:avoid; margin-bottom:8px; }
+    .cenario-block .cb-title { font-weight:900; font-size:9px; color:var(--orange); margin:6px 0 3px; }
+    .cenario-block table { font-size:8px !important; width:100%; border-collapse:collapse; }
+    .cenario-block th, .cenario-block td { padding:3px 6px !important; border-bottom:1px solid #eee; }
+    .cenario-block tfoot td { font-weight:900 !important; border-top:2px solid var(--orange); border-bottom:none; }
   }
   .pdf-rep-header{display:none;background:var(--orange);color:white;
     padding:10px 20px;border-radius:8px;margin-bottom:16px;font-size:14px;font-weight:900;}
@@ -858,6 +868,10 @@
         <div class="litem" style="color:var(--orange);font-size:9px">- - - Meta 100%</div>
       </div>
     </div></div>
+  </div>
+  <div class="print-only-cenario">
+    <div class="stitle">📦 &nbsp;Relação de Clientes — Cenário Comercial (Previsões)</div>
+    <div id="pdf-cenario-list"></div>
   </div>
 </div>
 
@@ -1880,6 +1894,7 @@ function recalc(){
 
   // 5. Tabela do Dashboard
   buildDashTable(disp);
+  buildCenarioDetalhe(disp);
 
   // 6. Rodapé do Dashboard
   const tReal_car = tM>0?(tR+tC)/tM:0;
@@ -2059,6 +2074,39 @@ function buildDashTable(vals){
       <td><span class="badge ${bg.c}">${bg.t}</span></td>
     </tr>`;
   });
+}
+
+// Relação de clientes do Cenário Comercial por representante, para incluir no PDF
+// (a mesma lista do tooltip de "Cenário", mas visível na impressão em vez de só no hover).
+function buildCenarioDetalhe(vals){
+  const wrap = $('pdf-cenario-list');
+  if(!wrap) return;
+
+  let html = '';
+  vals.forEach((r, _pos)=>{
+    let repIdx = BASE.findIndex(b => b.name === r.name);
+    if(repIdx < 0) repIdx = _pos;
+    const clients = (CLIENTS[repIdx] || []).filter(c => c.selected === true);
+    if(clients.length === 0) return;
+
+    let total = 0;
+    const rows = clients.map(c=>{
+      const value = toNumber(c.value);
+      total += value;
+      return `<tr><td>${c.name}</td><td style="text-align:right">${R(value)}</td></tr>`;
+    }).join('');
+
+    html += `<div class="cenario-block">
+      <div class="cb-title">${r.name}</div>
+      <table>
+        <thead><tr><th style="text-align:left">Cliente</th><th style="text-align:right">Valor (R$)</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td>Total</td><td style="text-align:right">${R(total)}</td></tr></tfoot>
+      </table>
+    </div>`;
+  });
+
+  wrap.innerHTML = html || '<div style="font-size:9px;color:#999;padding:6px 0">Nenhum cliente no Cenário Comercial para os representantes selecionados.</div>';
 }
 
 function showClientTooltip(repIdx, event){
