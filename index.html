@@ -69,8 +69,8 @@
 
     /* mostrar só a aba marcada */
     .page { display:none !important; }
-    .page.print-target { display:block !important; padding:2px 0; page-break-inside:avoid; }
-    .page > div { page-break-inside:avoid; }
+    .page.print-target { display:block !important; padding:2px 0; }
+    .page > div:not(.print-only-cenario) { page-break-inside:avoid; }
 
     /* ── Aba Clientes Inativos: impressão compacta, sem vazio ── */
     #page-inatividade.print-target { page-break-inside:auto !important; }
@@ -165,8 +165,10 @@
                       font-size:8px !important; margin-bottom:3px !important; border-radius:3px !important; }
 
     /* relação de clientes do Cenário Comercial (só aparece no PDF) */
+    /* flui e quebra entre páginas normalmente — só cada bloco de representante
+       (.cenario-block) evita quebrar no meio */
     .print-only-cenario { display:none; }
-    .page.print-target .print-only-cenario { display:block !important; margin-top:8px !important; }
+    .page.print-target .print-only-cenario { display:block !important; margin-top:8px !important; page-break-inside:auto !important; }
     .print-only-cenario .stitle { font-size:10px !important; padding:7px 10px !important; margin-bottom:6px !important; }
     .cenario-block { page-break-inside:avoid; margin-bottom:8px; }
     .cenario-block .cb-title { font-weight:900; font-size:9px; color:var(--orange); margin:6px 0 3px; }
