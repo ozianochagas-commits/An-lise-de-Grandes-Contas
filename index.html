@@ -56,6 +56,10 @@
     padding:3px 10px;font-size:10px;font-weight:700;display:none;}
   .filter-badge.show{display:inline-block;}
 
+  /* Relação de clientes do Cenário Comercial: só deve aparecer no PDF
+     exportado, nunca na tela normal do Dashboard. */
+  .print-only-cenario{display:none;}
+
   /* PRINT / PDF */
   @media print{
     /* forçar impressão de cores em tudo */
@@ -167,7 +171,6 @@
     /* relação de clientes do Cenário Comercial (só aparece no PDF) */
     /* flui e quebra entre páginas normalmente — só cada bloco de representante
        (.cenario-block) evita quebrar no meio */
-    .print-only-cenario { display:none; }
     .page.print-target .print-only-cenario { display:block !important; margin-top:8px !important; page-break-inside:auto !important; }
     .print-only-cenario .stitle { font-size:10px !important; padding:7px 10px !important; margin-bottom:6px !important; }
     .cenario-block { page-break-inside:avoid; margin-bottom:8px; }
