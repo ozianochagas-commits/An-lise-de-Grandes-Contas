@@ -608,11 +608,74 @@
 
     return dadosSupabase.map(rep => ({
       name: rep.nome,
-      meta: rep.meta || 0,
-      real: rep.realizado || 0,
-      prev: rep.cenario_comercial || 0,
-      car: rep.carteira || 0
+      meta: Number(rep.meta) || 0,
+      real: Number(rep.realizado) || 0,
+      prev: Number(rep.cenario_comercial) || 0,
+      car: Number(rep.carteira) || 0
     }));
+  }
+
+  // Cache do id de cada representante (tabela "representantes"), para não
+  // precisar buscar de novo a cada sincronização.
+  let __representanteIdPorNome = null;
+  async function obterRepresentanteIdPorNome() {
+    if (__representanteIdPorNome) return __representanteIdPorNome;
+    if (!window.supabaseClient) return null;
+    const { data, error } = await window.supabaseClient
+      .from('representantes')
+      .select('id,nome');
+    if (error || !data) return null;
+    __representanteIdPorNome = {};
+    data.forEach(r => { __representanteIdPorNome[r.nome] = r.id; });
+    return __representanteIdPorNome;
+  }
+
+  // Sobe as edições de META/REALIZADO/CENÁRIO/CARTEIRA para o Supabase,
+  // para que qualquer pessoa que abra o dashboard veja os mesmos dados
+  // (antes disso, as edições só ficavam salvas no navegador de quem editou).
+  async function salvarDadosMensaisSupabase(mes) {
+    initSupabase();
+    if (!window.supabaseClient) return { cloud: false, motivo: 'Supabase não inicializado' };
+
+    const idsPorNome = await obterRepresentanteIdPorNome();
+    if (!idsPorNome) return { cloud: false, motivo: 'Não foi possível resolver os representantes' };
+
+    // getVals() lê o valor ATUAL dos inputs (o que o usuário digitou),
+    // igual ao que a tela usa para recalcular — não usar BASE aqui, que só
+    // é atualizado quando os dados são carregados, não a cada edição.
+    const vals = (typeof getVals === 'function') ? getVals() : BASE;
+    const rows = vals
+      .filter(r => idsPorNome[r.name] !== undefined)
+      .map(r => ({
+        representante_id: idsPorNome[r.name],
+        mes: mes,
+        meta: r.meta,
+        realizado: r.real,
+        cenario_comercial: r.prev,
+        carteira: r.car,
+        updated_at: new Date().toISOString()
+      }));
+    if (!rows.length) return { cloud: false, motivo: 'Nenhum representante reconhecido' };
+
+    try {
+      const { error } = await window.supabaseClient
+        .from('dados_mensais')
+        .upsert(rows, { onConflict: 'representante_id,mes' });
+      if (error) throw error;
+      console.log('✅ Dados mensais sincronizados com o Supabase para', mes);
+      return { cloud: true };
+    } catch (err) {
+      console.error('❌ Dados salvos localmente, mas o Supabase recusou a sincronização:', err);
+      return { cloud: false, motivo: err?.message || String(err) };
+    }
+  }
+
+  // Debounce: espera o usuário parar de digitar antes de gravar na nuvem,
+  // para não disparar uma escrita a cada tecla pressionada.
+  let __syncDadosMensaisTimer = null;
+  function agendarSyncDadosMensais(mes) {
+    if (__syncDadosMensaisTimer) clearTimeout(__syncDadosMensaisTimer);
+    __syncDadosMensaisTimer = setTimeout(() => { salvarDadosMensaisSupabase(mes); }, 900);
   }
 
   // Função global para buscar dados de clientes (incluindo inativos) do Supabase
@@ -6034,13 +6097,16 @@ function saveData(){
       car: $('i-car-'+i) ? $('i-car-'+i).value : ''
     }))
   };
-  try{ 
+  try{
     const key = getStoreKey();
     localStorage.setItem(key, JSON.stringify(data));
     showNotification(`💾 Dados salvos!`);
   }catch(e){
     showNotification(`❌ Erro ao salvar!`);
   }
+  // Sobe para o Supabase (com debounce) para os dados ficarem online
+  // e iguais para quem quer que abra o dashboard.
+  if(typeof agendarSyncDadosMensais === 'function') agendarSyncDadosMensais(currentMonth + '-01');
 }
 
 function loadData(){
@@ -6107,9 +6173,30 @@ async function initDashboard() {
   // Abre SEMPRE no trimestre vigente (a edição salva nesse trimestre)
   if(!shared){ currentTrimestre = getVigenteTrimestre(); }
   aplicarTrimestreUI(currentTrimestre);
+
+  // 3.5. Busca no Supabase os dados mensais mais recentes (META/REALIZADO/
+  //      CENÁRIO/CARTEIRA), para qualquer pessoa que abra o dashboard ver
+  //      os MESMOS números — não só quem editou neste navegador.
+  //      Link compartilhado (shared) mantém o retrato que veio no link.
+  let carregouOnline = false;
+  if(!shared){
+    try{
+      initSupabase();
+      const dadosSupabase = await carregarDadosSupabase(currentMonth + '-01');
+      const baseAtualizado = mapearDadosSupabase(dadosSupabase);
+      if(baseAtualizado && baseAtualizado.length){
+        baseAtualizado.forEach(rOnline=>{
+          const alvo = BASE.find(b => b.name === rOnline.name);
+          if(alvo){ alvo.meta=rOnline.meta; alvo.real=rOnline.real; alvo.prev=rOnline.prev; alvo.car=rOnline.car; }
+        });
+        carregouOnline = true;
+      }
+    }catch(e){ console.warn('⚠️ Não foi possível carregar os dados online; usando o que estiver salvo neste navegador.', e); }
+  }
+
   renderEditTable();    // cria inputs com valores BASE (saveData bloqueado: _ready=false)
   renderTrimTable();    // idem
-  loadData();           // restaura os valores digitados do mês (se houver)
+  if(!carregouOnline) loadData(); // sem dados online: usa o que foi salvo neste navegador
   loadDataTrim();       // restaura os valores do trimestre selecionado
   _ready = true;        // a partir daqui, saveData() pode gravar normalmente
   updateFilterText();   // atualiza o texto do filtro
