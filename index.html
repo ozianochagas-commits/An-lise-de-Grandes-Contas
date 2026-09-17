@@ -5804,6 +5804,10 @@ async function empacotarLink(payload, repLabel){
   }catch(e){ alert('Erro ao gerar o link.'); }
 }
 
+// Gera o link do que está sendo visto AGORA: a aba aberta e os
+// representantes marcados no filtro do topo — funciona em qualquer
+// aba (Dashboard, Editar Dados, Trimestre, etc.), pois o filtro e o
+// botão "Gerar Link" ficam na barra que aparece em todas elas.
 function gerarLinkCompartilhar(){
   if(typeof LZString === 'undefined'){ alert('A biblioteca de compressão não carregou. Recarregue a página.'); return; }
   if(_ready){ try{ saveData(); saveDataTrim(); saveClientsData(); }catch(e){} }
@@ -5812,12 +5816,28 @@ function gerarLinkCompartilhar(){
     const k = localStorage.key(i);
     if(k && k.indexOf('riosulense_') === 0) ls[k] = localStorage.getItem(k);
   }
+
+  const checkboxes = Array.from(document.querySelectorAll('.rep-checkbox'));
+  const selectedReps = checkboxes.filter(cb => cb.checked).map(cb => parseInt(cb.dataset.idx));
+  const allSelected = checkboxes.length > 0 && selectedReps.length === checkboxes.length;
+
+  let repLabel;
+  if(checkboxes.length === 0 || allSelected){
+    repLabel = 'Todos os Representantes';
+  } else if(selectedReps.length === 1){
+    repLabel = BASE[selectedReps[0]].name;
+  } else {
+    repLabel = `${selectedReps.length} Representantes Selecionados`;
+  }
+
   const payload = {
     v: 1, ts: Date.now(), month: currentMonth, ls: ls,
-    inativByRep: (INATIV_BY_REP && Object.keys(INATIV_BY_REP).length) ? INATIV_BY_REP : null
+    inativByRep: (INATIV_BY_REP && Object.keys(INATIV_BY_REP).length) ? INATIV_BY_REP : null,
+    activeTab: currentTab,
+    selectedReps: allSelected ? null : selectedReps
   };
   mostrarLinkGerando();
-  empacotarLink(payload, 'Dashboard completo (todos)');
+  empacotarLink(payload, repLabel);
 }
 
 // Gera link SÓ do representante selecionado na aba Clientes Inativos
@@ -5921,6 +5941,8 @@ function aplicarPayload(payload){
   window.__onlyInativ = payload.onlyInativ || false;
   window.__mesNome = payload.mesNome || null;      // nome do mês escolhido (ex: "Agosto 2026")
   window.__resMes = payload.resMes || null;        // Resultado do Mês (Realizado / % / Carteira)
+  window.__sharedActiveTab = payload.activeTab || null;       // aba em que o link foi gerado
+  window.__sharedSelectedReps = payload.selectedReps || null; // representantes marcados no filtro
   return true;
 }
 
@@ -6003,6 +6025,18 @@ function aplicarModoVisualizacao(){
     // vai para a aba Clientes Inativos
     const tabInativ = Array.from(document.querySelectorAll('.tab')).find(t => t.getAttribute('onclick') && t.getAttribute('onclick').indexOf('inatividade')>=0);
     if(tabInativ) showTab(tabInativ, 'inatividade');
+  } else {
+    // Link geral (gerado pelo botão "Gerar Link" em qualquer aba): abre
+    // direto na MESMA aba e com os MESMOS representantes marcados que
+    // estavam selecionados quando o link foi gerado.
+    if(window.__sharedActiveTab){ navFromSelect(window.__sharedActiveTab); }
+    if(window.__sharedSelectedReps && Array.isArray(window.__sharedSelectedReps)){
+      const idxs = window.__sharedSelectedReps;
+      document.querySelectorAll('.rep-checkbox').forEach(cb => {
+        cb.checked = idxs.includes(parseInt(cb.dataset.idx));
+      });
+      applyFilter();
+    }
   }
 
   // Trava o seletor de representante, se o link for individual
