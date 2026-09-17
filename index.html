@@ -904,7 +904,7 @@
         <th>Projeção (R$)</th><th>% Realizado</th><th>% Real+Cart</th><th>% Projetado</th><th>Status</th>
       </tr></thead>
       <tbody id="prev-tbody"></tbody>
-      <tfoot><tr><td>TOTAL GERAL</td><td id="pft-meta">—</td><td id="pft-real">—</td><td id="pft-prev">—</td><td id="pft-car">—</td><td id="pft-proj">—</td><td id="pft-atp">—</td><td id="pft-real-car-pct">—</td><td id="pft-prj">—</td><td></td></tr></tfoot>
+      <tfoot><tr><td>TOTAL</td><td id="pft-meta">—</td><td id="pft-real">—</td><td id="pft-prev">—</td><td id="pft-car">—</td><td id="pft-proj">—</td><td id="pft-atp">—</td><td id="pft-real-car-pct">—</td><td id="pft-prj">—</td><td></td></tr></tfoot>
     </table>
   </div>
 </div>
@@ -1895,16 +1895,13 @@ function recalc(){
     buildChart(disp);
   }
 
-  // 8. Rodapé da aba "Editar Dados" e painel de resumo (sempre totais gerais)
-  let aM=0,aR=0,aP=0,aC=0;
-  vals.forEach(r=>{ aM+=r.meta; aR+=r.real; aP+=r.prev; aC+=r.car; });
-  const aProj=aR+aP+aC, aPrj=aM>0?aProj/aM:0, aAtp=aM>0?aR/aM:0, aReal_car=aM>0?(aR+aC)/aM:0;
-  sv('pft-meta',R(aM)); sv('pft-real',R(aR)); sv('pft-prev',R(aP)); sv('pft-car',R(aC));
-  sv('pft-proj',R(aProj)); sv('pft-atp',P(aAtp)); sv('pft-real-car-pct',P(aReal_car)); sv('pft-prj',P(aPrj));
-  sv('pv-meta',R(aM)); sv('pv-real',R(aR)); sv('pv-prev',R(aP));
-  sv('pv-proj',R(aProj)); sv('pv-pct',P(aPrj)+' da meta');
-  sv('pv-atp',P(aAtp)); sv('pv-prj',P(aPrj));
-  sv('hero-proj',R(aProj)); sv('hero-pct',P(aPrj)+' da meta');
+  // 8. Rodapé da aba "Editar Dados" e painel de resumo (segue o filtro de representantes)
+  sv('pft-meta',R(tM)); sv('pft-real',R(tR)); sv('pft-prev',R(tP)); sv('pft-car',R(tC));
+  sv('pft-proj',R(tProj)); sv('pft-atp',P(tAtp)); sv('pft-real-car-pct',P(tReal_car)); sv('pft-prj',P(tPrj));
+  sv('pv-meta',R(tM)); sv('pv-real',R(tR)); sv('pv-prev',R(tP));
+  sv('pv-proj',R(tProj)); sv('pv-pct',P(tPrj)+' da meta');
+  sv('pv-atp',P(tAtp)); sv('pv-prj',P(tPrj));
+  sv('hero-proj',R(tProj)); sv('hero-pct',P(tPrj)+' da meta');
   // Atualiza o nome do mês na Projeção Total
   const mesMostrado = monthFullName(currentMonth) || 'Mês';
   sv('hero-mes', mesMostrado);
