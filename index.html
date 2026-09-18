@@ -6004,7 +6004,10 @@ function gerarLinkCompartilhar(){
     v: 1, ts: Date.now(), month: currentMonth, ls: ls,
     inativByRep: (INATIV_BY_REP && Object.keys(INATIV_BY_REP).length) ? INATIV_BY_REP : null,
     activeTab: currentTab,
-    selectedReps: allSelected ? null : selectedReps
+    selectedReps: allSelected ? null : selectedReps,
+    // Link de UM representante específico: trava o filtro pra quem recebe
+    // não conseguir marcar outros representantes e ver dados que não são dele.
+    lockSingleRep: (!allSelected && selectedReps.length === 1) ? selectedReps[0] : null
   };
   mostrarLinkGerando();
   empacotarLink(payload, repLabel);
@@ -6113,6 +6116,8 @@ function aplicarPayload(payload){
   window.__resMes = payload.resMes || null;        // Resultado do Mês (Realizado / % / Carteira)
   window.__sharedActiveTab = payload.activeTab || null;       // aba em que o link foi gerado
   window.__sharedSelectedReps = payload.selectedReps || null; // representantes marcados no filtro
+  window.__lockSingleRep = (payload.lockSingleRep !== undefined && payload.lockSingleRep !== null)
+    ? payload.lockSingleRep : null;                            // link de 1 representante só: trava o filtro
   return true;
 }
 
@@ -6227,6 +6232,21 @@ function aplicarModoVisualizacao(){
         cb.checked = idxs.includes(parseInt(cb.dataset.idx));
       });
       applyFilter();
+    }
+
+    // Link de UM representante específico: trava o filtro pra quem recebe
+    // não conseguir marcar outro representante e ver dados que não são dele.
+    if(window.__lockSingleRep !== null && window.__lockSingleRep !== undefined){
+      document.querySelectorAll('.rep-checkbox').forEach(cb => { cb.disabled = true; });
+      const repAll = $('rep-all'); if(repAll) repAll.disabled = true;
+      const filterBtn = $('filter-btn');
+      if(filterBtn){
+        filterBtn.disabled = true;
+        filterBtn.onclick = null;
+        filterBtn.style.cursor = 'not-allowed';
+        filterBtn.style.opacity = '.85';
+      }
+      const menu = $('filter-menu'); if(menu) menu.style.display = 'none';
     }
   }
 
