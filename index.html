@@ -1407,7 +1407,17 @@
         <input type="text" class="modal-input client-value" id="modal-client-value" placeholder="Valor">
         <button class="modal-btn-add" onclick="addClientToPreview()">+ Adicionar</button>
       </div>
-      
+
+      <div style="margin:8px 0;">
+        <button type="button" class="modal-btn-add" style="background:var(--dark);" onclick="toggleBulkAdd()">📋 Colar vários clientes de uma vez</button>
+      </div>
+      <div id="bulk-add-area" style="display:none;margin-bottom:12px;">
+        <textarea id="modal-bulk-textarea" placeholder="Cole aqui uma lista, um cliente por linha (nome e valor separados por TAB ou terminando em R$ valor). Exemplo:&#10;4886-PECA PECAS COMERCIO LTDA	R$ 50.000,00&#10;8921-RONI CONQUISTA COMERCIO LTDA	R$ 50.000,00" style="width:100%;min-height:120px;padding:8px;border:1px solid #ddd;border-radius:8px;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical;"></textarea>
+        <div style="margin-top:8px;text-align:right;">
+          <button type="button" class="modal-btn-add" onclick="addClientesEmMassa()">+ Adicionar todos</button>
+        </div>
+      </div>
+
       <div class="modal-clients-list" id="modal-clients-list"></div>
       <div class="modal-total" id="modal-total" style="display:none;">
         <span>Total Cenário Comercial:</span>
@@ -1663,6 +1673,83 @@ function addClientToPreview(){
   
   // Mostra notificação de sucesso
   showNotification('✓ Cliente adicionado com sucesso!');
+}
+
+// ── ADICIONAR VÁRIOS CLIENTES DE UMA VEZ (colar de planilha) ────────────
+function toggleBulkAdd(){
+  const area = $('bulk-add-area');
+  if(!area) return;
+  const mostrar = area.style.display === 'none';
+  area.style.display = mostrar ? 'block' : 'none';
+  if(mostrar) $('modal-bulk-textarea').focus();
+}
+
+// Cada linha vira {name, value}. Aceita "nome<TAB>R$ valor" (colado do Excel)
+// ou "nome R$ valor" na mesma linha sem tab.
+function parseBulkClientesInput(texto){
+  const linhas = String(texto || '').split(/\r?\n/);
+  const resultado = [];
+  const erros = [];
+
+  linhas.forEach(linhaOriginal => {
+    const linha = linhaOriginal.trim();
+    if(!linha) return;
+
+    let nome = '', valorStr = '';
+
+    if(linha.includes('\t')){
+      const partes = linha.split('\t').map(p => p.trim()).filter(Boolean);
+      valorStr = partes.pop() || '';
+      nome = partes.join(' ').trim();
+    } else {
+      const match = linha.match(/^(.*?)\s*R\$\s*([\d.,]+)\s*$/i);
+      if(match){
+        nome = match[1].trim();
+        valorStr = match[2];
+      }
+    }
+
+    const valor = toNumber(valorStr.replace(/R\$\s*/i, ''));
+
+    if(!nome || !(valor > 0)){
+      erros.push(linhaOriginal);
+      return;
+    }
+
+    resultado.push({ name: nome, value: valor });
+  });
+
+  return { resultado, erros };
+}
+
+function addClientesEmMassa(){
+  if(currentModalRepIndex < 0) return;
+
+  const textarea = $('modal-bulk-textarea');
+  const { resultado, erros } = parseBulkClientesInput(textarea.value);
+
+  if(!resultado.length){
+    alert('Não consegui reconhecer nenhum cliente nesse texto. Confira se cada linha tem nome e valor (ex.: "Cliente<TAB>R$ 50.000,00").');
+    return;
+  }
+
+  if(!CLIENTS[currentModalRepIndex]) CLIENTS[currentModalRepIndex] = [];
+  resultado.forEach(c => CLIENTS[currentModalRepIndex].push(c));
+
+  textarea.value = '';
+  renderClientsList();
+
+  const totalClients = getTotalClientsPrevision(currentModalRepIndex);
+  const inputPrev = $('i-prev-'+currentModalRepIndex);
+  if(inputPrev) inputPrev.value = fmtN(totalClients);
+
+  saveClientsData();
+  saveData();
+  recalc();
+
+  let msg = `✓ ${resultado.length} cliente(s) adicionado(s) com sucesso!`;
+  if(erros.length) msg += ` — ${erros.length} linha(s) não reconhecida(s)`;
+  showNotification(msg);
 }
 
 function toggleClientSelection(clientIdx){
