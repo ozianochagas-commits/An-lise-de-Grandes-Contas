@@ -4570,11 +4570,15 @@ async function parsePlanoPlanilha(file){
 
           const temPeriodo = tituloNorm.includes('TRIMESTRE') || tituloNorm.includes('SEMESTRE');
           const temRepresentante = tituloNorm.includes('REPRESENTACOES') || tituloNorm.includes('PLANOS');
+          // Formato 5: "(568) IG -  3º TRIMESTRE 2026  (RN, PB, PE, AL, SE)" — sem
+          // "REPRESENTAÇÕES"/"PLANOS" no título, só o código entre parênteses e o período.
+          const temCodigoRepresentante = /^\s*\(\d+\)\s+\S/.test(firstCellVal);
 
           // Cabeçalhos com período podem aparecer em qualquer ponto do arquivo (múltiplas seções).
           // Cabeçalho contendo apenas "REPRESENTAÇÕES" continua aceito no início como compatibilidade.
           const isSecaoHeader = (temRepresentante && temPeriodo) ||
-            (rowIdx < 10 && tituloNorm.includes('REPRESENTACOES'));
+            (rowIdx < 10 && tituloNorm.includes('REPRESENTACOES')) ||
+            (rowIdx < 10 && temCodigoRepresentante && temPeriodo);
 
           if (rowIdx < 20 && tituloNorm.includes('REPRESENTACOES')) {
             console.log(`  [Row ${rowNum}] Verificando: "${firstCellVal}" → seção=${isSecaoHeader}`);
