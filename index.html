@@ -1780,6 +1780,25 @@ function toggleClientSelection(clientIdx){
   recalc();
 }
 
+function toggleSelectAllClients(marcar){
+  const clients = CLIENTS[currentModalRepIndex];
+  if(!clients || !clients.length) return;
+
+  clients.forEach(c => { c.selected = marcar; });
+
+  saveClientsData();
+  renderClientsList();
+
+  const totalClients = getTotalClientsPrevision(currentModalRepIndex);
+  const inputPrev = $('i-prev-'+currentModalRepIndex);
+  if(inputPrev) {
+    inputPrev.value = fmtN(totalClients);
+  }
+
+  saveData();
+  recalc();
+}
+
 function removeClient(clientIdx){
   if(currentModalRepIndex < 0) return;
   CLIENTS[currentModalRepIndex].splice(clientIdx, 1);
@@ -1812,13 +1831,17 @@ function renderClientsList(){
   }
   
   let somaTotal = 0, somaPassou = 0;
+  const todosSelecionados = clients.length > 0 && clients.every(c => c.selected);
 
   // Cabecalho das colunas
   const head = document.createElement('div');
   head.className = 'modal-client-item';
   head.style.cssText = 'background:#1C1C1C;color:#fff;font-weight:800;font-size:9px;text-transform:uppercase;letter-spacing:.5px;';
   head.innerHTML = `
-    <div style="padding-left:24px;">Cliente</div>
+    <div style="display:flex;align-items:center;gap:8px;padding-left:24px;">
+      <input type="checkbox" class="client-checkbox" id="check-all" ${todosSelecionados ? 'checked' : ''} onchange="toggleSelectAllClients(this.checked)" title="Selecionar todos">
+      <span>Cliente</span>
+    </div>
     <span class="cel-num">Cenário</span>
     <span class="cel-num">Passou</span>
     <span class="cel-num">Gap</span>
