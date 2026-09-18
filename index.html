@@ -6226,6 +6226,12 @@ function aplicarModoVisualizacao(){
     // direto na MESMA aba e com os MESMOS representantes marcados que
     // estavam selecionados quando o link foi gerado.
     if(window.__sharedActiveTab){ navFromSelect(window.__sharedActiveTab); }
+
+    // Trava a navegação entre seções: quem recebe o link só vê a mesma
+    // tela (aba) que estava aberta quando o link foi gerado.
+    const navSelect = document.getElementById('nav-select');
+    if(navSelect){ navSelect.disabled = true; navSelect.style.cursor = 'not-allowed'; navSelect.style.opacity = '.85'; }
+
     if(window.__sharedSelectedReps && Array.isArray(window.__sharedSelectedReps)){
       const idxs = window.__sharedSelectedReps;
       document.querySelectorAll('.rep-checkbox').forEach(cb => {
