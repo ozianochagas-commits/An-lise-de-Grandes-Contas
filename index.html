@@ -3944,16 +3944,21 @@ function mergePlanoClientes(existentes = [], novos = []) {
       continue;
     }
 
-    atual.total = planoNum(atual.total) + planoNum(cli.total);
-    atual.objetivo = planoNum(atual.objetivo) + planoNum(cli.objetivo);
+    // O Total R$ de cada cliente já vem CONSOLIDADO (acumulado do trimestre)
+    // na própria planilha. Uma nova importação do mesmo cliente é sempre uma
+    // versão mais recente/atualizada do mesmo período — não um valor adicional
+    // a somar. Por isso a importação mais nova SUBSTITUI os números do cliente,
+    // em vez de somar (o que dobraria o valor de quem aparece nas duas planilhas).
+    atual.total = planoNum(cli.total);
+    atual.objetivo = planoNum(cli.objetivo);
     atual.falta = atual.objetivo - atual.total;
     atual.resultadoPct = atual.objetivo > 0 ? atual.total / atual.objetivo : 0;
 
-    // Mantém os dados textuais mais completos quando a primeira origem vier vazia.
-    atual.cliente = atual.cliente || cli.cliente;
-    atual.uf = atual.uf || cli.uf;
-    atual.codCli = atual.codCli || cli.codCli;
-    atual.periodo = atual.periodo || cli.periodo;
+    // Mantém os dados textuais mais completos quando a nova origem vier vazia.
+    atual.cliente = cli.cliente || atual.cliente;
+    atual.uf = cli.uf || atual.uf;
+    atual.codCli = cli.codCli || atual.codCli;
+    atual.periodo = cli.periodo || atual.periodo;
   }
 
   return Array.from(map.values());
@@ -3991,18 +3996,21 @@ function mergePlanoGrupos(existentes = [], novos = []) {
       continue;
     }
 
-    // O total/objetivo do grupo já é consolidado pelo parser. Portanto soma-se
-    // grupo com grupo; os clientes são unidos apenas para detalhamento.
-    atual.total = planoNum(atual.total) + planoNum(grupo.total);
-    atual.objetivo = planoNum(atual.objetivo) + planoNum(grupo.objetivo);
+    // O total/objetivo do grupo já vem CONSOLIDADO (acumulado do trimestre) na
+    // planilha. Quando o mesmo grupo aparece de novo em uma nova importação do
+    // mesmo período, é porque a planilha foi reenviada atualizada — a
+    // importação mais nova SUBSTITUI os números do grupo, em vez de somar
+    // (somar dobraria o valor de quem já constava na importação anterior).
+    atual.total = planoNum(grupo.total);
+    atual.objetivo = planoNum(grupo.objetivo);
     atual.falta = atual.objetivo - atual.total;
     atual.resultadoPct = atual.objetivo > 0 ? atual.total / atual.objetivo : 0;
     atual.clientes = mergePlanoClientes(atual.clientes || [], grupo.clientes || []);
 
-    atual.nome = atual.nome || grupo.nome;
-    atual.uf = atual.uf || grupo.uf;
-    atual.codCli = atual.codCli || grupo.codCli;
-    atual.periodo = atual.periodo || grupo.periodo;
+    atual.nome = grupo.nome || atual.nome;
+    atual.uf = grupo.uf || atual.uf;
+    atual.codCli = grupo.codCli || atual.codCli;
+    atual.periodo = grupo.periodo || atual.periodo;
   }
 
   return Array.from(map.values());
