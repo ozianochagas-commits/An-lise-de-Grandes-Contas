@@ -1276,10 +1276,11 @@
     <select id="plano-rep-select" onchange="onPlanoRepChange()" style="padding:8px 14px;border:2px solid var(--orange);border-radius:7px;font-size:12px;font-weight:700;color:var(--dark);background:#FFF8F5;cursor:pointer;min-width:240px;">
       <option value="">Todos os Representantes</option>
     </select>
-    <button class="pdf-btn" onclick="document.getElementById('plano-file-input').click()" style="margin:0;background:var(--dark);font-size:11px;padding:8px 16px;">
+    <button id="plano-reimport-btn" class="pdf-btn" onclick="document.getElementById('plano-file-input').click()" style="margin:0;background:var(--dark);font-size:11px;padding:8px 16px;">
       <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 4h5v7h7v9H6V4z"/></svg>
       Reimportar / Adicionar
     </button>
+    <span id="plano-readonly-badge" style="display:none;font-size:11px;font-weight:700;color:#999;padding:8px 4px;">🔒 Somente leitura</span>
   </div>
 
   <!-- ÁREA DE IMPORTAÇÃO -->
@@ -1320,7 +1321,7 @@
               <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 4h5v7h7v9H6V4z"/></svg>
               Exportar PDF
             </button>
-            <button class="reset-btn" onclick="clearPlanoImport()" style="height:38px;border-radius:6px">↺ Nova Importação</button>
+            <button id="plano-nova-importacao-btn" class="reset-btn" onclick="clearPlanoImport()" style="height:38px;border-radius:6px">↺ Nova Importação</button>
           </div>
         </div>
 
@@ -5805,7 +5806,12 @@ function copyPlanoLink(){
   // Gerar parâmetros de URL
   const params = new URLSearchParams();
   params.set('view', 'plano');
-  if (selectedRep) params.set('rep', encodeURIComponent(selectedRep));
+  if (selectedRep) {
+    params.set('rep', encodeURIComponent(selectedRep));
+    // Link de um representante específico é sempre somente-leitura:
+    // quem recebe só pode ver os números dele, não editar/reimportar.
+    params.set('ro', '1');
+  }
   if (selectedTrimestre) params.set('trim', selectedTrimestre);
 
   // URL compartilhável
@@ -6499,8 +6505,32 @@ async function initDashboard() {
 
       // Aplicar filtro
       applyPlanoFilter();
+
+      // Link de um representante específico (?ro=1): trava em somente-leitura
+      if(repParam && urlParams.get('ro') === '1') {
+        ativarPlanoSomenteLeitura();
+      }
     }, 100);
   }
+}
+
+// Bloqueia edição/importação do Plano de Negócio para quem abriu um link
+// individual de representante — só pode ver os números daquele representante.
+function ativarPlanoSomenteLeitura(){
+  const repSelect = $('plano-rep-select');
+  if(repSelect) repSelect.disabled = true;
+
+  const reimportBtn = $('plano-reimport-btn');
+  if(reimportBtn) reimportBtn.style.display = 'none';
+
+  const novaImportacaoBtn = $('plano-nova-importacao-btn');
+  if(novaImportacaoBtn) novaImportacaoBtn.style.display = 'none';
+
+  const badge = $('plano-readonly-badge');
+  if(badge) badge.style.display = 'inline-block';
+
+  const linkBtn = document.querySelector('#plano-summary-panel button[onclick="copyPlanoLink()"]');
+  if(linkBtn) linkBtn.style.display = 'none';
 }
 
 // Iniciar quando DOM estiver pronto
