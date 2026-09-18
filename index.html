@@ -5911,10 +5911,29 @@ function linkEmbutido(payload){
 async function empacotarLink(payload, repLabel){
   const base = location.origin + location.pathname;
   payload = minifyForShare(payload);
-  // guarda comprimido na nuvem p/ ocupar pouco
+
+  // 1) tenta link CURTO guardando na nuvem DO PRÓPRIO APP (Supabase) — é a
+  //    mesma infra que já usamos pra tudo, então é bem mais confiável do
+  //    que depender de um serviço externo gratuito (jsonblob/TinyURL).
+  try{
+    initSupabase();
+    if(window.supabaseClient){
+      const { data, error } = await window.supabaseClient
+        .from('shared_links')
+        .insert({ payload })
+        .select('id')
+        .single();
+      if(!error && data && data.id){
+        mostrarLinkModal(base + '#s=' + data.id, repLabel, true);
+        return;
+      }
+    }
+  }catch(e){ /* Supabase indisponível → tenta os fallbacks externos */ }
+
+  // guarda comprimido na nuvem externa p/ ocupar pouco
   const blob = { c: LZString.compressToBase64(JSON.stringify(payload)) };
 
-  // 1) tenta link CURTO via nuvem (jsonblob, grátis, sem conta)
+  // 2) tenta link CURTO via nuvem externa (jsonblob, grátis, sem conta)
   try{
     const resp = await fetch(JSONBLOB_API, {
       method: 'POST',
@@ -5927,7 +5946,7 @@ async function empacotarLink(payload, repLabel){
     }
   }catch(e){ /* sem internet / CORS / serviço fora → tenta TinyURL */ }
 
-  // 2) fallback: tenta TinyURL para encurtar o link longo
+  // 4) fallback: tenta TinyURL para encurtar o link longo
   try{
     const comp = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
     const longLink = base + '#d=' + comp;
@@ -5940,7 +5959,7 @@ async function empacotarLink(payload, repLabel){
     }
   }catch(e){ /* TinyURL também falhou → usa reserva */ }
 
-  // 3) reserva: link longo com dados embutidos
+  // 5) reserva: link longo com dados embutidos
   try{
     const comp = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
     mostrarLinkModal(base + '#d=' + comp, repLabel, false);
@@ -6103,6 +6122,27 @@ function aplicarPayload(payload){
 async function carregarLinkCompartilhado(){
   try{
     const h = location.hash || '';
+    if(h.indexOf('#s=') === 0){
+      const id = h.substring(3);
+      mostrarCarregandoLink(true);
+      try{
+        initSupabase();
+        if(window.supabaseClient){
+          const { data, error } = await window.supabaseClient
+            .from('shared_links')
+            .select('payload')
+            .eq('id', id)
+            .single();
+          if(!error && data && data.payload){
+            mostrarCarregandoLink(false);
+            return aplicarPayload(data.payload);
+          }
+        }
+      }catch(e){}
+      mostrarCarregandoLink(false);
+      window.__shareLoadError = true;   // não conseguiu carregar da nuvem
+      return false;
+    }
     if(h.indexOf('#b=') === 0){
       const id = h.substring(3);
       mostrarCarregandoLink(true);
