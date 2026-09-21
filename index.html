@@ -4617,6 +4617,8 @@ async function parsePlanoPlanilha(file){
         // estão sempre nas colunas B/C.
         // ═══════════════════════════════════════════════════════════════════════════════
         let codigoAgrupadorMap = {}; // CodCli -> Nome do agrupador/cliente
+        let filialParentMap = {}; // CodCli da filial -> CodCli do agrupador/grupo pai
+        let gruposComFiliais = new Set(); // CodCli de agrupadores que têm ao menos uma filial
         try {
           const parserAux = new DOMParser();
           const sharedFileAux = zip.file('xl/sharedStrings.xml');
@@ -4675,6 +4677,7 @@ async function parsePlanoPlanilha(file){
             let headerPos = -1;
             let codigoCol = -1;
             let nomeCol = -1;
+            let filiaisCol = -1;
 
             // Procurar cabeçalho nas primeiras 30 linhas.
             for (let ri = 0; ri < Math.min(30, rowsAux.length); ri++) {
@@ -4688,6 +4691,7 @@ async function parsePlanoPlanilha(file){
                 const ci = Number(ciStr);
                 if (codigoCol < 0 && /(^|\s)(COD|CODIGO|CODCLI|COD CLIENTE)(\s|$)/.test(header)) codigoCol = ci;
                 if (nomeCol < 0 && (header.includes('CLIENTE') || header.includes('RAZAO') || header === 'NOME')) nomeCol = ci;
+                if (filiaisCol < 0 && header.includes('FILIA')) filiaisCol = ci;
               }
 
               // Compatibilidade com modelos antigos que trazem UF | Código | Cliente.
@@ -4703,6 +4707,7 @@ async function parsePlanoPlanilha(file){
 
               codigoCol = -1;
               nomeCol = -1;
+              filiaisCol = -1;
             }
 
             if (headerPos < 0) continue;
@@ -4720,6 +4725,20 @@ async function parsePlanoPlanilha(file){
               if (codigo && nome && normalizeHeader(codigo) !== 'CODIGO') {
                 codigoAgrupadorMap[codigo] = nome;
                 encontrados++;
+
+                // Coluna "Filiais" traz os códigos das filiais deste agrupador
+                // em texto livre (ex.: "5530/ 6406/ 6854 / 2404 / 2362" ou
+                // "8452 - 9132"). Extrai todos os números encontrados.
+                if (filiaisCol >= 0) {
+                  const filiaisTexto = String(cellMapAux[filiaisCol] || '');
+                  const codigosFiliais = filiaisTexto.match(/\d+/g) || [];
+                  codigosFiliais.forEach(codFilial => {
+                    if (codFilial !== codigo) {
+                      filialParentMap[codFilial] = codigo;
+                      gruposComFiliais.add(codigo);
+                    }
+                  });
+                }
               }
             }
 
@@ -4796,6 +4815,7 @@ async function parsePlanoPlanilha(file){
         let secaoAtual = null;
         let representantePrevio = ''; // Guardar representante da seção anterior
         let objetivoColIndex = 4; // Coluna padrão para objetivo (coluna E, índice 4)
+        let totalGrupoColIndex = -1; // Coluna "Total Grupo" (soma já consolidada das filiais), se existir
 
         Array.from(rows).forEach((row, rowIdx) => {
           let cellsArray = row.querySelectorAll('c');
@@ -4926,6 +4946,10 @@ async function parsePlanoPlanilha(file){
             // Procurar por "Objetivo", "Meta", "Falta", etc
             for (let col = 3; col <= 10; col++) {
               const headerVal = getCellValue(cellMap, col).toUpperCase();
+              if (headerVal.includes('TOTAL') && headerVal.includes('GRUPO')) {
+                totalGrupoColIndex = col;
+                console.log(`📊 Detectado "Total Grupo" em coluna ${col} (${headerVal})`);
+              }
               if (headerVal.includes('META') || headerVal.includes('OBJETIVO') ||
                   headerVal.includes('TRIMESTRAL') || headerVal.includes('SEMESTRAL')) {
                 // Encontrou uma coluna que pode ser objetivo
@@ -4976,74 +5000,116 @@ async function parsePlanoPlanilha(file){
 
           // ═══════════════════════════════════════════════════════════
           // TODOS OS CLIENTES VÃO PARA O GRUPO PERÍODO-ESPECÍFICO
-          // NÃO criar grupos separados por "- Agrupador"
+          // Filiais (mapeadas pela coluna "Filiais" da aba auxiliar) ficam
+          // agrupadas DENTRO do cliente/agrupador ao qual pertencem, com a UF
+          // de cada filial, em vez de caírem num balde genérico.
           // ═══════════════════════════════════════════════════════════
           if (cliente) {
-            // Verificar se tem Código Agrupador (lido da 2ª aba)
-            const temAgrupador = codigoAgrupadorMap[codCli];
-            let grupoDestino;
+            // Esta linha É o próprio agrupador (código bate com a aba auxiliar)?
+            const nomeAgrupador = codigoAgrupadorMap[codCli];
+            // Esta linha é FILIAL de outro agrupador (código está listado na
+            // coluna "Filiais" de outro código)?
+            const codCliPai = filialParentMap[codCli];
 
-            if (temAgrupador) {
-              // Cliente com agrupador - criar/usar grupo com esse código
-              grupoDestino = secaoAtual.grupos.find(g => g.codCli === codCli);
+            const getOrCreateGrupo = (codGrupo, nomeGrupo, ufGrupo) => {
+              let g = secaoAtual.grupos.find(x => x.codCli === codGrupo);
+              if (!g) {
+                g = {
+                  nome: nomeGrupo,
+                  uf: ufGrupo,
+                  codCli: codGrupo,
+                  total: 0,
+                  objetivo: 0,
+                  falta: 0,
+                  resultadoPct: 0,
+                  periodo: secaoAtual.periodo,
+                  clientes: []
+                };
+                secaoAtual.grupos.push(g);
+                console.log(`    + Grupo criado: ${nomeGrupo} (${codGrupo})`);
+              }
+              return g;
+            };
 
-              if (!grupoDestino) {
-                grupoDestino = {
-                  nome: temAgrupador,
+            if (nomeAgrupador) {
+              // Linha do agrupador: os totais já vêm consolidados na própria
+              // planilha (coluna "Total Grupo" quando existir), então
+              // SOBRESCREVEM os do grupo em vez de somar em cima do que as
+              // filiais já processadas tiverem acrescentado.
+              const grupoDestino = getOrCreateGrupo(codCli, nomeAgrupador, uf);
+              const totalConsolidado = totalGrupoColIndex >= 0
+                ? (parseFloat(getCellValue(cellMap, totalGrupoColIndex)) || 0)
+                : total;
+
+              grupoDestino.nome = nomeAgrupador;
+              grupoDestino.uf = uf;
+              grupoDestino.total = totalConsolidado;
+              grupoDestino.objetivo = objetivo;
+              grupoDestino.falta = objetivo - totalConsolidado;
+              grupoDestino.resultadoPct = objetivo > 0 ? totalConsolidado / objetivo : 0;
+
+              // Quando o agrupador tem filiais, a matriz também é "uma filial"
+              // (com sua UF própria) e entra na lista para aparecer igual às
+              // demais — só o rótulo "- Agrupador" é removido.
+              if (gruposComFiliais.has(codCli)) {
+                const nomeLimpo = cliente.replace(/\s*-?\s*Agrupador\s*$/i, '').trim() || cliente;
+                grupoDestino.clientes.push({
                   uf: uf,
                   codCli: codCli,
-                  total: 0,
+                  cliente: nomeLimpo,
+                  total: total,
                   objetivo: 0,
                   falta: 0,
                   resultadoPct: 0,
-                  periodo: secaoAtual.periodo,
-                  clientes: []
-                };
-                secaoAtual.grupos.push(grupoDestino);
-                console.log(`    + Grupo criado: ${temAgrupador} (${codCli})`);
+                  periodo: secaoAtual.periodo
+                });
               }
+
+              console.log(`      • [GRUPO] ${nomeAgrupador}: R$ ${totalConsolidado.toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})} / R$ ${objetivo.toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})}`);
+            } else if (codCliPai) {
+              // Linha de uma filial: entra na lista de filiais do grupo pai,
+              // sem alterar os totais do grupo (que vêm da linha do agrupador).
+              const nomeGrupoPai = codigoAgrupadorMap[codCliPai] || cliente;
+              const grupoDestino = getOrCreateGrupo(codCliPai, nomeGrupoPai, uf);
+
+              grupoDestino.clientes.push({
+                uf: uf,
+                codCli: codCli,
+                cliente: cliente,
+                total: total,
+                objetivo: 0,
+                falta: 0,
+                resultadoPct: 0,
+                periodo: secaoAtual.periodo
+              });
+
+              console.log(`      • [FILIAL de ${nomeGrupoPai}] ${uf} ${cliente}: R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})}`);
             } else {
-              // Cliente sem agrupador - ir para CLIENTE TRIMESTRAIS/SEMESTRAIS
+              // Cliente sem agrupador nem filiação conhecida - ir para
+              // CLIENTE TRIMESTRAIS/SEMESTRAIS (comportamento anterior).
               const nomeGrupo = secaoAtual.periodo === 'SEMESTRAL' ? 'CLIENTE SEMESTRAIS' : 'CLIENTE TRIMESTRAIS';
-              grupoDestino = secaoAtual.grupos.find(g => g.codCli === '0000');
+              const grupoDestino = getOrCreateGrupo('0000', nomeGrupo, 'XX');
 
-              if (!grupoDestino) {
-                grupoDestino = {
-                  nome: nomeGrupo,
-                  uf: 'XX',
-                  codCli: '0000',
-                  total: 0,
-                  objetivo: 0,
-                  falta: 0,
-                  resultadoPct: 0,
-                  periodo: secaoAtual.periodo,
-                  clientes: []
-                };
-                secaoAtual.grupos.push(grupoDestino);
-                console.log(`    + Grupo criado: ${nomeGrupo}`);
-              }
+              grupoDestino.clientes.push({
+                uf: uf,
+                codCli: codCli,
+                cliente: cliente,
+                total: total,
+                objetivo: objetivo,
+                falta: falta,
+                resultadoPct: resultadoPct,
+                periodo: secaoAtual.periodo
+              });
+
+              grupoDestino.total += total;
+              grupoDestino.objetivo += objetivo;
+              grupoDestino.falta = grupoDestino.objetivo - grupoDestino.total;
+              grupoDestino.resultadoPct = grupoDestino.objetivo > 0
+                ? grupoDestino.total / grupoDestino.objetivo
+                : 0;
+
+              console.log(`      • ${cliente}: R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})} / R$ ${objetivo.toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})}`);
             }
-
-            // Adicionar cliente ao grupo
-            grupoDestino.clientes.push({
-              uf: uf,
-              codCli: codCli,
-              cliente: cliente,
-              total: total,
-              objetivo: objetivo,
-              falta: falta,
-              resultadoPct: resultadoPct,
-              periodo: secaoAtual.periodo
-            });
-            console.log(`      • ${cliente}: R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})} / R$ ${objetivo.toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})}`);
-
-            // Atualizar totais do grupo
-            grupoDestino.total += total;
-            grupoDestino.objetivo += objetivo;
-            grupoDestino.falta = grupoDestino.objetivo - grupoDestino.total;
-            grupoDestino.resultadoPct = grupoDestino.objetivo > 0
-              ? grupoDestino.total / grupoDestino.objetivo
-              : 0;
           }
         });
 
@@ -5864,10 +5930,11 @@ function renderPlanoTable(dados){
       grupoRow.setAttribute('data-periodo-grupo', periodoIndex);
       grupoRow.setAttribute('data-grupo', currentGrupoIndex);
 
+      const numFiliais = (grupo.clientes || []).length;
       grupoRow.innerHTML = `
         <td style="padding-left:28px;"><span style="margin-right:8px;">▶</span></td>
         <td>${grupo.codCli}</td>
-        <td>${grupo.nome}</td>
+        <td>${grupo.nome}${numFiliais > 1 ? `<span style="font-size:9px;color:#999;font-weight:600;margin-left:6px;">(${numFiliais} filiais)</span>` : ''}</td>
         <td style="text-align:right;">${formatMoney(grupo.total)}</td>
         <td style="text-align:right;">${formatMoney(grupo.objetivo)}</td>
         <td style="text-align:right;">${formatMoney(grupo.falta)}</td>
@@ -5901,7 +5968,7 @@ function renderPlanoTable(dados){
         cliRow.innerHTML = `
           <td style="padding-left:42px;"></td>
           <td>${cli.codCli}</td>
-          <td>${cli.cliente}</td>
+          <td>↳ ${cli.uf ? `<span style="display:inline-block;background:#7CB342;color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:10px;margin-right:5px;vertical-align:middle;">${cli.uf}</span>` : ''}${cli.cliente}</td>
           <td style="text-align:right;">${formatMoney(cli.total)}</td>
           <td style="text-align:right;">${formatMoney(cli.objetivo)}</td>
           <td style="text-align:right;">${formatMoney(cli.falta)}</td>
