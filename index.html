@@ -4167,6 +4167,11 @@ function toggleFilialExcluida(codCli) {
   applyPlanoFilter();
 }
 
+// Grupos (chave "periodo|codCli") que estão expandidos na tabela do Plano.
+// A tabela é reconstruída do zero a cada renderPlanoTable(), então guardamos
+// isso fora das linhas pra não fechar tudo quando só uma filial é marcada.
+let PLANO_GRUPOS_EXPANDIDOS = new Set();
+
 // ── ACÚMULO DE IMPORTAÇÕES DO PLANO ────────────────────────────────────────
 // Cada novo Excel deve SOMAR ao que já foi importado para o mesmo
 // representante + tipo de período + número do período. Não substitui.
@@ -5968,38 +5973,53 @@ function renderPlanoTable(dados){
       totalFalta += faltaAjustada;
 
       // Linha do AGRUPADOR
+      // A tabela inteira é reconstruída (tbody.innerHTML='') sempre que algo
+      // muda (ex.: marcar uma filial "fora da carteira"), então o estado de
+      // expandido/recolhido de cada grupo precisa ser guardado FORA da
+      // linha (num Set global), senão toda marcação fecha tudo de novo.
+      const grupoKey = `${grupo.periodo || periodoKey}|${grupo.codCli}`;
+      const jaExpandido = PLANO_GRUPOS_EXPANDIDOS.has(grupoKey);
+
       const grupoRow = document.createElement('tr');
       grupoRow.style.background = '#f9f9f9';
       grupoRow.style.fontWeight = 'bold';
-      grupoRow.style.cursor = 'pointer';
       grupoRow.setAttribute('data-periodo-grupo', periodoIndex);
       grupoRow.setAttribute('data-grupo', currentGrupoIndex);
+      grupoRow.setAttribute('data-expanded', jaExpandido ? 'true' : 'false');
 
       const numFiliais = (grupo.clientes || []).length;
       grupoRow.innerHTML = `
-        <td style="padding-left:28px;"><span style="margin-right:8px;">▶</span></td>
+        <td style="padding-left:28px;cursor:pointer;" class="grupo-toggle"><span style="margin-right:8px;">${jaExpandido ? '▼' : '▶'}</span></td>
         <td>${grupo.codCli}</td>
-        <td>${grupo.nome}${numFiliais > 1 ? `<span style="font-size:9px;color:#999;font-weight:600;margin-left:6px;">(${numFiliais} filiais)</span>` : ''}</td>
+        <td style="cursor:pointer;" class="grupo-toggle">${grupo.nome}${numFiliais > 1 ? `<span style="font-size:9px;color:#999;font-weight:600;margin-left:6px;">(${numFiliais} filiais)</span>` : ''}</td>
         <td style="text-align:right;">${formatMoney(totalAjustado)}</td>
         <td style="text-align:right;">${formatMoney(grupo.objetivo)}</td>
         <td style="text-align:right;">${formatMoney(faltaAjustada)}</td>
         <td style="text-align:right;">${(resultadoPctAjustado * 100).toFixed(1)}%</td>
       `;
 
-      grupoRow.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const isExpanded = this.getAttribute('data-expanded') === 'true';
-        const icon = this.querySelector('span');
+      // Só a célula da seta e a do nome (em negrito) abrem/fecham o grupo —
+      // clicar nos valores (Total/Objetivo/Falta/%) não deve fechar nada.
+      grupoRow.querySelectorAll('.grupo-toggle').forEach(cell => {
+        cell.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const isExpanded = grupoRow.getAttribute('data-expanded') === 'true';
+          const icon = grupoRow.querySelector('span');
 
-        this.setAttribute('data-expanded', !isExpanded);
-        icon.textContent = isExpanded ? '▶' : '▼';
+          if (isExpanded) {
+            PLANO_GRUPOS_EXPANDIDOS.delete(grupoKey);
+          } else {
+            PLANO_GRUPOS_EXPANDIDOS.add(grupoKey);
+          }
+          grupoRow.setAttribute('data-expanded', !isExpanded);
+          icon.textContent = isExpanded ? '▶' : '▼';
 
-        // Mostrar/ocultar clientes deste grupo
-        const clientRows = tbody.querySelectorAll(`tr[data-cliente-grupo="${currentGrupoIndex}"]`);
-        clientRows.forEach(row => row.style.display = isExpanded ? 'none' : 'table-row');
+          // Mostrar/ocultar clientes deste grupo
+          const clientRows = tbody.querySelectorAll(`tr[data-cliente-grupo="${currentGrupoIndex}"]`);
+          clientRows.forEach(row => row.style.display = isExpanded ? 'none' : 'table-row');
+        });
       });
 
-      grupoRow.setAttribute('data-expanded', 'false');
       tbody.appendChild(grupoRow);
 
       // Linhas dos CLIENTES dentro do agrupador
@@ -6007,7 +6027,7 @@ function renderPlanoTable(dados){
         const cliRow = document.createElement('tr');
         cliRow.setAttribute('data-periodo-cliente', periodoIndex);
         cliRow.setAttribute('data-cliente-grupo', currentGrupoIndex);
-        cliRow.style.display = 'none';
+        cliRow.style.display = jaExpandido ? 'table-row' : 'none';
         cliRow.style.paddingLeft = '42px';
 
         const excluida = isFilialExcluida(cli.codCli);
