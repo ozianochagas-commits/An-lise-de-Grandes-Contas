@@ -6123,7 +6123,10 @@ function renderPlanoTable(dados){
           <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:#666;">Total</span>
           <span style="font-weight:900;color:var(--dark);">${formatMoney(totalExcluidoGeral)}</span>
         </div>
-        <div style="font-size:9px;color:#999;margin-top:6px;">Já abatido do Objetivo/meta acima — o Total Faturado continua cheio.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 8px;margin-top:8px;background:var(--orange);border-radius:6px;">
+          <span style="font-size:9px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.3px;max-width:110px;">Total Geral (Carteira + Outras Regiões)</span>
+          <span style="font-weight:900;color:#fff;font-size:13px;">${formatMoney(totalFaturado)}</span>
+        </div>
       `;
       outrasRegioesBox.style.display = 'block';
     } else {
