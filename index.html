@@ -5954,11 +5954,10 @@ function renderPlanoTable(dados){
       grupoIndex++;
       const currentGrupoIndex = grupoIndex;
 
-      totalObjetivo += Number(grupo.objetivo) || 0;
       // Filiais marcadas como fora da carteira do representante saem do
-      // Total R$ do grupo (e por consequência da Falta/Resultado% e dos
-      // totais gerais), sem alterar o Objetivo (a meta do trimestre não é
-      // dividida por filial nos dados importados).
+      // Total R$ do grupo E do Objetivo (o valor da filial é abatido da
+      // meta também), pra Falta/Resultado% refletirem só a carteira real
+      // deste representante.
       const filiaisExcluidas = (grupo.clientes || []).filter(c => isFilialExcluida(c.codCli));
       const valorExcluido = filiaisExcluidas.reduce((soma, c) => soma + (Number(c.total) || 0), 0);
       filiaisExcluidas.forEach(c => {
@@ -5966,9 +5965,11 @@ function renderPlanoTable(dados){
         valorExcluidoPorUf[uf] = (valorExcluidoPorUf[uf] || 0) + (Number(c.total) || 0);
       });
       const totalAjustado = (Number(grupo.total) || 0) - valorExcluido;
-      const faltaAjustada = (Number(grupo.objetivo) || 0) - totalAjustado;
-      const resultadoPctAjustado = grupo.objetivo > 0 ? (totalAjustado / grupo.objetivo) : 0;
+      const objetivoAjustado = (Number(grupo.objetivo) || 0) - valorExcluido;
+      const faltaAjustada = objetivoAjustado - totalAjustado;
+      const resultadoPctAjustado = objetivoAjustado > 0 ? (totalAjustado / objetivoAjustado) : 0;
 
+      totalObjetivo += objetivoAjustado;
       totalFaturado += totalAjustado;
       totalFalta += faltaAjustada;
 
@@ -5993,7 +5994,7 @@ function renderPlanoTable(dados){
         <td>${grupo.codCli}</td>
         <td style="cursor:pointer;" class="grupo-toggle">${grupo.nome}${numFiliais > 1 ? `<span style="font-size:9px;color:#999;font-weight:600;margin-left:6px;">(${numFiliais} filiais)</span>` : ''}</td>
         <td style="text-align:right;">${formatMoney(totalAjustado)}</td>
-        <td style="text-align:right;">${formatMoney(grupo.objetivo)}</td>
+        <td style="text-align:right;">${formatMoney(objetivoAjustado)}</td>
         <td style="text-align:right;">${formatMoney(faltaAjustada)}</td>
         <td style="text-align:right;">${(resultadoPctAjustado * 100).toFixed(1)}%</td>
       `;
