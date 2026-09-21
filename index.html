@@ -6097,12 +6097,17 @@ function renderPlanoTable(dados){
 
   // "Valor fora da carteira, por UF" — soma das filiais marcadas, agrupada
   // por estado, para mostrar pra onde esse valor deveria ir (outro rep/região).
+  // Só faz sentido com UM representante selecionado: em "Todos os
+  // Representantes" o valor "fora da carteira" de um já pode ser a carteira
+  // de outro, então a caixa fica escondida.
   const outrasRegioesBox = $('plano-outras-regioes-box');
   const outrasRegioesLista = $('plano-outras-regioes-lista');
   const ufsComValor = Object.keys(valorExcluidoPorUf).sort();
+  const repSelectAtual = $('plano-rep-select');
+  const repSelecionado = repSelectAtual ? repSelectAtual.value : '';
 
   if (outrasRegioesBox && outrasRegioesLista) {
-    if (ufsComValor.length) {
+    if (repSelecionado && ufsComValor.length) {
       const totalExcluidoGeral = ufsComValor.reduce((soma, uf) => soma + valorExcluidoPorUf[uf], 0);
       // Total Faturado já é o valor AJUSTADO (com as filiais marcadas fora).
       // Somando de volta o que foi excluído, dá pra ver o valor cheio do
