@@ -6103,6 +6103,10 @@ function renderPlanoTable(dados){
   if (outrasRegioesBox && outrasRegioesLista) {
     if (ufsComValor.length) {
       const totalExcluidoGeral = ufsComValor.reduce((soma, uf) => soma + valorExcluidoPorUf[uf], 0);
+      // Total Faturado já é o valor AJUSTADO (com as filiais marcadas fora).
+      // Somando de volta o que foi excluído, dá pra ver o valor cheio do
+      // plano, somando a carteira deste representante com as outras regiões.
+      const totalGeralComOutrasRegioes = totalFaturado + totalExcluidoGeral;
       outrasRegioesLista.innerHTML = ufsComValor.map(uf => `
         <div style="display:flex;justify-content:space-between;padding:3px 0;">
           <span style="display:inline-block;background:#7CB342;color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">${uf}</span>
@@ -6112,6 +6116,10 @@ function renderPlanoTable(dados){
         <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid #e0d5c5;">
           <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:#666;">Total</span>
           <span style="font-weight:900;color:var(--dark);">${formatMoney(totalExcluidoGeral)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 8px;margin-top:8px;background:var(--dark);border-radius:6px;">
+          <span style="font-size:9px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.3px;max-width:110px;">Total geral (carteira + outras regiões)</span>
+          <span style="font-weight:900;color:#fff;font-size:13px;">${formatMoney(totalGeralComOutrasRegioes)}</span>
         </div>
       `;
       outrasRegioesBox.style.display = 'block';
