@@ -6102,12 +6102,18 @@ function renderPlanoTable(dados){
 
   if (outrasRegioesBox && outrasRegioesLista) {
     if (ufsComValor.length) {
+      const totalExcluidoGeral = ufsComValor.reduce((soma, uf) => soma + valorExcluidoPorUf[uf], 0);
       outrasRegioesLista.innerHTML = ufsComValor.map(uf => `
         <div style="display:flex;justify-content:space-between;padding:3px 0;">
           <span style="display:inline-block;background:#7CB342;color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">${uf}</span>
           <span style="font-weight:700;">${formatMoney(valorExcluidoPorUf[uf])}</span>
         </div>
-      `).join('');
+      `).join('') + `
+        <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid #e0d5c5;">
+          <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:#666;">Total</span>
+          <span style="font-weight:900;color:var(--dark);">${formatMoney(totalExcluidoGeral)}</span>
+        </div>
+      `;
       outrasRegioesBox.style.display = 'block';
     } else {
       outrasRegioesLista.innerHTML = '';
