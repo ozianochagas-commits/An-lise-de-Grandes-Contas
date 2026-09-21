@@ -6110,9 +6110,10 @@ function renderPlanoTable(dados){
     if (repSelecionado && ufsComValor.length) {
       const totalExcluidoGeral = ufsComValor.reduce((soma, uf) => soma + valorExcluidoPorUf[uf], 0);
       // Total Faturado (acima) continua CHEIO — a venda aconteceu de
-      // verdade. Só o Objetivo/meta já foi abatido por esse valor. Esta
-      // caixa mostra quanto pertence a filiais marcadas como de outra
-      // região, e o total cheio de novo pra referência.
+      // verdade, e o Objetivo/meta já foi abatido por esse valor pra achar
+      // a Falta (isso não muda). Só a caixa abaixo ("Total Geral") mostra o
+      // Total Faturado MENOS o que é de outra região, pra ver o que é de
+      // fato da carteira deste representante.
       outrasRegioesLista.innerHTML = ufsComValor.map(uf => `
         <div style="display:flex;justify-content:space-between;padding:3px 0;">
           <span style="display:inline-block;background:#7CB342;color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">${uf}</span>
@@ -6125,7 +6126,7 @@ function renderPlanoTable(dados){
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 8px;margin-top:8px;background:var(--orange);border-radius:6px;">
           <span style="font-size:9px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.3px;max-width:110px;">Total Geral (Carteira + Outras Regiões)</span>
-          <span style="font-weight:900;color:#fff;font-size:13px;">${formatMoney(totalFaturado)}</span>
+          <span style="font-weight:900;color:#fff;font-size:13px;">${formatMoney(totalFaturado - totalExcluidoGeral)}</span>
         </div>
       `;
       outrasRegioesBox.style.display = 'block';
