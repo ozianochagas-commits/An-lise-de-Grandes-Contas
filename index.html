@@ -4137,6 +4137,31 @@ function clearInativImport(){
 let PLANO_BY_REP = {};
 const PLANO_TABLE = 'plano_negocio';
 
+// ── FILIAIS FORA DA CARTEIRA DO REPRESENTANTE ──────────────────────────────
+// Códigos de filial marcados manualmente como "não pertence à carteira deste
+// representante" — o valor dessa filial sai do Total R$ do grupo na tela
+// (fica salvo no navegador; não altera os dados importados/Supabase).
+let PLANO_FILIAIS_EXCLUIDAS = new Set();
+try {
+  const salvoExcluidas = JSON.parse(localStorage.getItem('PLANO_FILIAIS_EXCLUIDAS') || '[]');
+  PLANO_FILIAIS_EXCLUIDAS = new Set(salvoExcluidas.map(String));
+} catch (e) { /* ignora localStorage inválido */ }
+
+function isFilialExcluida(codCli) {
+  return PLANO_FILIAIS_EXCLUIDAS.has(String(codCli));
+}
+
+function toggleFilialExcluida(codCli) {
+  const cod = String(codCli);
+  if (PLANO_FILIAIS_EXCLUIDAS.has(cod)) {
+    PLANO_FILIAIS_EXCLUIDAS.delete(cod);
+  } else {
+    PLANO_FILIAIS_EXCLUIDAS.add(cod);
+  }
+  localStorage.setItem('PLANO_FILIAIS_EXCLUIDAS', JSON.stringify(Array.from(PLANO_FILIAIS_EXCLUIDAS)));
+  applyPlanoFilter();
+}
+
 // ── ACÚMULO DE IMPORTAÇÕES DO PLANO ────────────────────────────────────────
 // Cada novo Excel deve SOMAR ao que já foi importado para o mesmo
 // representante + tipo de período + número do período. Não substitui.
@@ -5919,8 +5944,19 @@ function renderPlanoTable(dados){
       const currentGrupoIndex = grupoIndex;
 
       totalObjetivo += Number(grupo.objetivo) || 0;
-      totalFaturado += Number(grupo.total) || 0;
-      totalFalta += Number(grupo.falta) || 0;
+      // Filiais marcadas como fora da carteira do representante saem do
+      // Total R$ do grupo (e por consequência da Falta/Resultado% e dos
+      // totais gerais), sem alterar o Objetivo (a meta do trimestre não é
+      // dividida por filial nos dados importados).
+      const valorExcluido = (grupo.clientes || [])
+        .filter(c => isFilialExcluida(c.codCli))
+        .reduce((soma, c) => soma + (Number(c.total) || 0), 0);
+      const totalAjustado = (Number(grupo.total) || 0) - valorExcluido;
+      const faltaAjustada = (Number(grupo.objetivo) || 0) - totalAjustado;
+      const resultadoPctAjustado = grupo.objetivo > 0 ? (totalAjustado / grupo.objetivo) : 0;
+
+      totalFaturado += totalAjustado;
+      totalFalta += faltaAjustada;
 
       // Linha do AGRUPADOR
       const grupoRow = document.createElement('tr');
@@ -5935,10 +5971,10 @@ function renderPlanoTable(dados){
         <td style="padding-left:28px;"><span style="margin-right:8px;">▶</span></td>
         <td>${grupo.codCli}</td>
         <td>${grupo.nome}${numFiliais > 1 ? `<span style="font-size:9px;color:#999;font-weight:600;margin-left:6px;">(${numFiliais} filiais)</span>` : ''}</td>
-        <td style="text-align:right;">${formatMoney(grupo.total)}</td>
+        <td style="text-align:right;">${formatMoney(totalAjustado)}</td>
         <td style="text-align:right;">${formatMoney(grupo.objetivo)}</td>
-        <td style="text-align:right;">${formatMoney(grupo.falta)}</td>
-        <td style="text-align:right;">${(grupo.resultadoPct * 100).toFixed(1)}%</td>
+        <td style="text-align:right;">${formatMoney(faltaAjustada)}</td>
+        <td style="text-align:right;">${(resultadoPctAjustado * 100).toFixed(1)}%</td>
       `;
 
       grupoRow.addEventListener('click', function(e) {
@@ -5965,11 +6001,20 @@ function renderPlanoTable(dados){
         cliRow.style.display = 'none';
         cliRow.style.paddingLeft = '42px';
 
+        const excluida = isFilialExcluida(cli.codCli);
+        const estiloExcluida = excluida ? 'text-decoration:line-through;opacity:.5;' : '';
+
         cliRow.innerHTML = `
           <td style="padding-left:42px;"></td>
           <td>${cli.codCli}</td>
-          <td>↳ ${cli.uf ? `<span style="display:inline-block;background:#7CB342;color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:10px;margin-right:5px;vertical-align:middle;">${cli.uf}</span>` : ''}${cli.cliente}</td>
-          <td style="text-align:right;">${formatMoney(cli.total)}</td>
+          <td>
+            ↳ ${cli.uf ? `<span style="display:inline-block;background:#7CB342;color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:10px;margin-right:5px;vertical-align:middle;">${cli.uf}</span>` : ''}<span style="${estiloExcluida}">${cli.cliente}</span>
+            <label style="margin-left:8px;vertical-align:middle;cursor:pointer;font-size:9px;color:#999;font-weight:600;" title="Marque se esta filial NÃO faz parte da carteira deste representante (o valor sai do Total R$ do grupo)">
+              <input type="checkbox" ${excluida ? 'checked' : ''} onclick="toggleFilialExcluida('${cli.codCli}')" style="vertical-align:middle;cursor:pointer;">
+              fora da carteira
+            </label>
+          </td>
+          <td style="text-align:right;${estiloExcluida}">${formatMoney(cli.total)}</td>
           <td style="text-align:right;">${formatMoney(cli.objetivo)}</td>
           <td style="text-align:right;">${formatMoney(cli.falta)}</td>
           <td style="text-align:right;">${(cli.resultadoPct * 100).toFixed(1)}%</td>
