@@ -5954,18 +5954,17 @@ function renderPlanoTable(dados){
       grupoIndex++;
       const currentGrupoIndex = grupoIndex;
 
-      // Filiais marcadas como "fora da carteira" abatem seu valor do
-      // OBJETIVO do grupo (a meta não é mais dele) — o Total R$ (faturado)
-      // continua CHEIO, porque a venda já aconteceu de verdade. Falta =
-      // Objetivo (já abatido) − Total (cheio), então ela cai de verdade.
+      // Marcar uma filial como "fora da carteira" é só uma ANOTAÇÃO: risca
+      // o nome dela e soma no quadro "Valor fora da carteira, por UF". NÃO
+      // subtrai nada de Total/Objetivo/Falta/Resultado% — esses ficam
+      // sempre com o valor cheio, direto da planilha importada.
       const filiaisExcluidas = (grupo.clientes || []).filter(c => isFilialExcluida(c.codCli));
-      const valorExcluido = filiaisExcluidas.reduce((soma, c) => soma + (Number(c.total) || 0), 0);
       filiaisExcluidas.forEach(c => {
         const uf = String(c.uf || '??').trim().toUpperCase() || '??';
         valorExcluidoPorUf[uf] = (valorExcluidoPorUf[uf] || 0) + (Number(c.total) || 0);
       });
       const totalAjustado = Number(grupo.total) || 0;
-      const objetivoAjustado = (Number(grupo.objetivo) || 0) - valorExcluido;
+      const objetivoAjustado = Number(grupo.objetivo) || 0;
       const faltaAjustada = objetivoAjustado - totalAjustado;
       const resultadoPctAjustado = objetivoAjustado > 0 ? (totalAjustado / objetivoAjustado) : 0;
 
@@ -6109,11 +6108,9 @@ function renderPlanoTable(dados){
   if (outrasRegioesBox && outrasRegioesLista) {
     if (repSelecionado && ufsComValor.length) {
       const totalExcluidoGeral = ufsComValor.reduce((soma, uf) => soma + valorExcluidoPorUf[uf], 0);
-      // Total Faturado (acima) continua CHEIO — a venda aconteceu de
-      // verdade, e o Objetivo/meta já foi abatido por esse valor pra achar
-      // a Falta (isso não muda). Só a caixa abaixo ("Total Geral") mostra o
-      // Total Faturado MENOS o que é de outra região, pra ver o que é de
-      // fato da carteira deste representante.
+      // Puramente informativo — não subtrai nada. Total/Objetivo/Falta/
+      // Resultado% (tabela principal) e o Total Geral abaixo ficam sempre
+      // com o valor cheio, direto da planilha importada.
       outrasRegioesLista.innerHTML = ufsComValor.map(uf => `
         <div style="display:flex;justify-content:space-between;padding:3px 0;">
           <span style="display:inline-block;background:#7CB342;color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">${uf}</span>
@@ -6126,7 +6123,7 @@ function renderPlanoTable(dados){
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 8px;margin-top:8px;background:var(--orange);border-radius:6px;">
           <span style="font-size:9px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.3px;max-width:110px;">Total Geral (Carteira + Outras Regiões)</span>
-          <span style="font-weight:900;color:#fff;font-size:13px;">${formatMoney(totalFaturado - totalExcluidoGeral)}</span>
+          <span style="font-weight:900;color:#fff;font-size:13px;">${formatMoney(totalFaturado)}</span>
         </div>
       `;
       outrasRegioesBox.style.display = 'block';
