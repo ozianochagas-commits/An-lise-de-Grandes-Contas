@@ -6109,8 +6109,8 @@ function renderPlanoTable(dados){
     if (repSelecionado && ufsComValor.length) {
       const totalExcluidoGeral = ufsComValor.reduce((soma, uf) => soma + valorExcluidoPorUf[uf], 0);
       // Puramente informativo — não subtrai nada. Total/Objetivo/Falta/
-      // Resultado% (tabela principal) e o Total Geral abaixo ficam sempre
-      // com o valor cheio, direto da planilha importada.
+      // Resultado% (tabela principal) ficam sempre com o valor cheio,
+      // direto da planilha importada.
       outrasRegioesLista.innerHTML = ufsComValor.map(uf => `
         <div style="display:flex;justify-content:space-between;padding:3px 0;">
           <span style="display:inline-block;background:#7CB342;color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">${uf}</span>
@@ -6120,10 +6120,6 @@ function renderPlanoTable(dados){
         <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid #e0d5c5;">
           <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:#666;">Total</span>
           <span style="font-weight:900;color:var(--dark);">${formatMoney(totalExcluidoGeral)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 8px;margin-top:8px;background:var(--orange);border-radius:6px;">
-          <span style="font-size:9px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.3px;max-width:110px;">Total Geral (Carteira + Outras Regiões)</span>
-          <span style="font-weight:900;color:#fff;font-size:13px;">${formatMoney(totalFaturado)}</span>
         </div>
       `;
       outrasRegioesBox.style.display = 'block';
