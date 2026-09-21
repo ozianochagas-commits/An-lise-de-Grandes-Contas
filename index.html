@@ -802,6 +802,109 @@
     __syncDadosMensaisTimer = setTimeout(() => { salvarDadosMensaisSupabase(mes); }, 900);
   }
 
+  // ── DADOS TRIMESTRAIS (Acumulado Trimestral) ────────────────────
+  // Mesma ideia do bloco de dados mensais acima, mas para a tabela
+  // "Acumulado Trimestral" (Meta Trimestral + 3 meses do trimestre), que
+  // antes só salvava no navegador de quem editou (localStorage) — por isso
+  // não aparecia em outro aparelho/celular.
+  const MESES_POR_TRIMESTRE = {
+    1: ['janeiro', 'fevereiro', 'marco'],
+    2: ['abril', 'maio', 'junho'],
+    3: ['julho', 'agosto', 'setembro'],
+    4: ['outubro', 'novembro', 'dezembro']
+  };
+
+  async function carregarDadosTrimestraisSupabase(numTri) {
+    if (!window.supabaseClient) return null;
+    const ano = new Date().getFullYear();
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('dados_trimestrais')
+        .select('*')
+        .eq('trimestre', numTri)
+        .eq('ano', ano);
+      if (error) { console.error('❌ Erro ao buscar dados trimestrais:', error); return null; }
+      if (!data || !data.length) return null;
+      return data;
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados trimestrais do Supabase:', error);
+      return null;
+    }
+  }
+
+  // Casa as linhas do Supabase (por representante_id) com o nome do
+  // representante, no formato usado pela tabela trimestral em tela.
+  async function mapearDadosTrimestraisSupabase(dadosSupabase, numTri) {
+    if (!dadosSupabase || !dadosSupabase.length) return null;
+    const idsPorNome = await obterRepresentanteIdPorNome();
+    if (!idsPorNome) return null;
+    const nomePorId = {};
+    Object.keys(idsPorNome).forEach(n => { nomePorId[idsPorNome[n]] = n; });
+    const cols = MESES_POR_TRIMESTRE[numTri];
+    if (!cols) return null;
+    return dadosSupabase
+      .map(row => ({
+        name: nomePorId[row.representante_id],
+        metaTrim: Number(row.meta_trimestral) || 0,
+        m1: Number(row[cols[0]]) || 0,
+        m2: Number(row[cols[1]]) || 0,
+        m3: Number(row[cols[2]]) || 0
+      }))
+      .filter(r => r.name);
+  }
+
+  // Sobe as edições da tabela Acumulado Trimestral para o Supabase, para
+  // quem abrir o dashboard em outro aparelho (ex.: celular) ver os mesmos
+  // valores — antes disso, ficavam só no navegador de quem editou.
+  async function salvarDadosTrimestraisSupabase(numTri) {
+    initSupabase();
+    if (!window.supabaseClient) return { cloud: false, motivo: 'Supabase não inicializado' };
+
+    const idsPorNome = await obterRepresentanteIdPorNome();
+    if (!idsPorNome) return { cloud: false, motivo: 'Não foi possível resolver os representantes' };
+
+    const cols = MESES_POR_TRIMESTRE[numTri];
+    if (!cols) return { cloud: false, motivo: 'Trimestre inválido' };
+    const ano = new Date().getFullYear();
+
+    const tv = (typeof getTVals === 'function') ? getTVals() : [];
+    const rows = tv
+      .filter(r => idsPorNome[r.name] !== undefined)
+      .map(r => {
+        const row = {
+          representante_id: idsPorNome[r.name],
+          trimestre: numTri,
+          ano: ano,
+          meta_trimestral: r.metaTrim,
+          updated_at: new Date().toISOString()
+        };
+        row[cols[0]] = r.m1;
+        row[cols[1]] = r.m2;
+        row[cols[2]] = r.m3;
+        return row;
+      });
+    if (!rows.length) return { cloud: false, motivo: 'Nenhum representante reconhecido' };
+
+    try {
+      const { error } = await window.supabaseClient
+        .from('dados_trimestrais')
+        .upsert(rows, { onConflict: 'representante_id,trimestre,ano' });
+      if (error) throw error;
+      console.log('✅ Dados trimestrais sincronizados com o Supabase para trimestre', numTri, ano);
+      return { cloud: true };
+    } catch (err) {
+      console.error('❌ Dados trimestrais salvos localmente, mas o Supabase recusou a sincronização:', err);
+      return { cloud: false, motivo: err?.message || String(err) };
+    }
+  }
+
+  // Debounce igual ao dos dados mensais.
+  let __syncDadosTrimestraisTimer = null;
+  function agendarSyncDadosTrimestrais(numTri) {
+    if (__syncDadosTrimestraisTimer) clearTimeout(__syncDadosTrimestraisTimer);
+    __syncDadosTrimestraisTimer = setTimeout(() => { salvarDadosTrimestraisSupabase(numTri); }, 900);
+  }
+
   // Inicializar quando a página carregar
   window.addEventListener('load', function() {
     setTimeout(() => {
@@ -2610,32 +2713,56 @@ function aplicarTrimestreUI(numTri){
 }
 
 // ── SELECIONAR TRIMESTRE ────────────────────────────────────────
-function selectTrimestre(numTri){
+async function selectTrimestre(numTri){
   // Salva dados do trimestre atual
   saveDataTrim();
-  
+
   // Muda para o novo trimestre
   currentTrimestre = numTri;
-  
+
   // Atualiza botões
   document.querySelectorAll('.trim-btn').forEach(btn => btn.classList.remove('active'));
   $('trim-btn-'+numTri).classList.add('active');
-  
+
   // Atualiza títulos
   const trim = TRIMESTRES[numTri];
   $('t-title').textContent = '📅 Acumulado Trimestral — ' + trim.title;
   $('t-months').textContent = trim.months;
   $('t-edit-months').textContent = trim.editMonths;
-  
+
   // Atualiza cabeçalhos da tabela
   $('t-th-m1').textContent = '✏️ ' + trim.headers[0] + ' (R$)';
   $('t-th-m2').textContent = '✏️ ' + trim.headers[1] + ' (R$)';
   $('t-th-m3').textContent = '✏️ ' + trim.headers[2] + ' (R$)';
-  
+
   // Regenera tabela com novos dados
   renderTrimTable();
-  loadDataTrim();
+  loadDataTrim();   // sempre parte do que está salvo neste navegador primeiro
   recalcTrim();
+
+  // Busca no Supabase os valores mais recentes deste trimestre — só
+  // sobrescreve quem o Supabase realmente tem dado; quem ainda não foi
+  // sincronizado mantém o que já estava salvo localmente.
+  try{
+    initSupabase();
+    const dadosTrimSupabase = await carregarDadosTrimestraisSupabase(numTri);
+    const trimAtualizado = await mapearDadosTrimestraisSupabase(dadosTrimSupabase, numTri);
+    if(trimAtualizado && trimAtualizado.length && currentTrimestre === numTri){
+      const trimData = TRIMESTRES[numTri].data;
+      const keys = TRIMESTRES[numTri].keys;
+      trimAtualizado.forEach(rOnline=>{
+        const idx = trimData.findIndex(b => b.name === rOnline.name);
+        if(idx < 0) return;
+        trimData[idx].metaTrim=rOnline.metaTrim; trimData[idx][keys[0]]=rOnline.m1; trimData[idx][keys[1]]=rOnline.m2; trimData[idx][keys[2]]=rOnline.m3;
+        const mEl=$('t-meta-'+idx), m1El=$('t-'+keys[0]+'-'+idx), m2El=$('t-'+keys[1]+'-'+idx), m3El=$('t-'+keys[2]+'-'+idx);
+        if(mEl) mEl.value = fmtN(rOnline.metaTrim);
+        if(m1El) m1El.value = fmtN(rOnline.m1);
+        if(m2El) m2El.value = fmtN(rOnline.m2);
+        if(m3El) m3El.value = fmtN(rOnline.m3);
+      });
+      recalcTrim();
+    }
+  }catch(e){ console.warn('⚠️ Não foi possível carregar os dados trimestrais online; usando o que estiver salvo neste navegador.', e); }
 }
 
 // ── SALVAR / RESTAURAR POR TRIMESTRE ─────────────────────────────
@@ -2656,6 +2783,9 @@ function saveDataTrim(){
   try{
     localStorage.setItem('riosulense_trim_'+currentTrimestre, JSON.stringify(data));
   }catch(e){}
+  // Sobe para o Supabase (com debounce) para os dados ficarem online
+  // e iguais para quem quer que abra o dashboard (ex.: no celular).
+  if(typeof agendarSyncDadosTrimestrais === 'function') agendarSyncDadosTrimestrais(currentTrimestre);
 }
 
 function loadDataTrim(){
@@ -6582,6 +6712,28 @@ async function initDashboard() {
 
     try{ await carregarClientesOnline(currentMonth + '-01'); }
     catch(e){ console.warn('⚠️ Não foi possível carregar os clientes online.', e); }
+
+    // 3.6. Mesma lógica acima, mas para a tabela Acumulado Trimestral —
+    //      só sobrescreve quem o Supabase realmente tem dado; quem ainda não
+    //      foi sincronizado mantém o que já estava salvo neste navegador.
+    try{
+      const dadosTrimSupabase = await carregarDadosTrimestraisSupabase(currentTrimestre);
+      const trimAtualizado = await mapearDadosTrimestraisSupabase(dadosTrimSupabase, currentTrimestre);
+      if(trimAtualizado && trimAtualizado.length){
+        const trimData = TRIMESTRES[currentTrimestre].data;
+        const keys = TRIMESTRES[currentTrimestre].keys;
+        trimAtualizado.forEach(rOnline=>{
+          const idx = trimData.findIndex(b => b.name === rOnline.name);
+          if(idx < 0) return;
+          trimData[idx].metaTrim=rOnline.metaTrim; trimData[idx][keys[0]]=rOnline.m1; trimData[idx][keys[1]]=rOnline.m2; trimData[idx][keys[2]]=rOnline.m3;
+          const mEl=$('t-meta-'+idx), m1El=$('t-'+keys[0]+'-'+idx), m2El=$('t-'+keys[1]+'-'+idx), m3El=$('t-'+keys[2]+'-'+idx);
+          if(mEl) mEl.value = fmtN(rOnline.metaTrim);
+          if(m1El) m1El.value = fmtN(rOnline.m1);
+          if(m2El) m2El.value = fmtN(rOnline.m2);
+          if(m3El) m3El.value = fmtN(rOnline.m3);
+        });
+      }
+    }catch(e){ console.warn('⚠️ Não foi possível carregar os dados trimestrais online; usando o que estiver salvo neste navegador.', e); }
   }
 
   _ready = true;        // a partir daqui, saveData() pode gravar normalmente
