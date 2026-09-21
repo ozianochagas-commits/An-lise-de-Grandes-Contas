@@ -1484,6 +1484,11 @@
           <div style="font-size:24px;font-weight:900;color:var(--dark);" id="plano-total-pct">0%</div>
         </div>
 
+        <div id="plano-outras-regioes-box" style="background:#fff8f0;border-radius:8px;padding:12px;margin-bottom:14px;border-left:3px solid #999;display:none;">
+          <div style="font-size:9px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Valor fora da carteira, por UF</div>
+          <div id="plano-outras-regioes-lista" style="font-size:12px;color:var(--dark);"></div>
+        </div>
+
         <button class="pdf-btn" onclick="copyPlanoLink()" style="width:100%;margin:0;background:#1E7E34;font-size:11px;">
           🔗 Link para Compartilhar
         </button>
@@ -5866,6 +5871,7 @@ function renderPlanoTable(dados){
   let totalObjetivo = 0;
   let totalFaturado = 0;
   let totalFalta = 0;
+  const valorExcluidoPorUf = {}; // UF -> soma do valor das filiais marcadas "fora da carteira"
   let periodoIndex = 0;
   let grupoIndex = 0;
 
@@ -5948,9 +5954,12 @@ function renderPlanoTable(dados){
       // Total R$ do grupo (e por consequência da Falta/Resultado% e dos
       // totais gerais), sem alterar o Objetivo (a meta do trimestre não é
       // dividida por filial nos dados importados).
-      const valorExcluido = (grupo.clientes || [])
-        .filter(c => isFilialExcluida(c.codCli))
-        .reduce((soma, c) => soma + (Number(c.total) || 0), 0);
+      const filiaisExcluidas = (grupo.clientes || []).filter(c => isFilialExcluida(c.codCli));
+      const valorExcluido = filiaisExcluidas.reduce((soma, c) => soma + (Number(c.total) || 0), 0);
+      filiaisExcluidas.forEach(c => {
+        const uf = String(c.uf || '??').trim().toUpperCase() || '??';
+        valorExcluidoPorUf[uf] = (valorExcluidoPorUf[uf] || 0) + (Number(c.total) || 0);
+      });
       const totalAjustado = (Number(grupo.total) || 0) - valorExcluido;
       const faltaAjustada = (Number(grupo.objetivo) || 0) - totalAjustado;
       const resultadoPctAjustado = grupo.objetivo > 0 ? (totalAjustado / grupo.objetivo) : 0;
@@ -6064,6 +6073,27 @@ function renderPlanoTable(dados){
   if (oldTotalObjetivoEl) oldTotalObjetivoEl.textContent = formatMoney(totalObjetivo);
   if (oldTotalFaltaEl) oldTotalFaltaEl.textContent = formatMoney(totalFalta);
   if (oldTotalPctEl) oldTotalPctEl.textContent = resultadoPctTotalStr + '%';
+
+  // "Valor fora da carteira, por UF" — soma das filiais marcadas, agrupada
+  // por estado, para mostrar pra onde esse valor deveria ir (outro rep/região).
+  const outrasRegioesBox = $('plano-outras-regioes-box');
+  const outrasRegioesLista = $('plano-outras-regioes-lista');
+  const ufsComValor = Object.keys(valorExcluidoPorUf).sort();
+
+  if (outrasRegioesBox && outrasRegioesLista) {
+    if (ufsComValor.length) {
+      outrasRegioesLista.innerHTML = ufsComValor.map(uf => `
+        <div style="display:flex;justify-content:space-between;padding:3px 0;">
+          <span style="display:inline-block;background:#7CB342;color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">${uf}</span>
+          <span style="font-weight:700;">${formatMoney(valorExcluidoPorUf[uf])}</span>
+        </div>
+      `).join('');
+      outrasRegioesBox.style.display = 'block';
+    } else {
+      outrasRegioesLista.innerHTML = '';
+      outrasRegioesBox.style.display = 'none';
+    }
+  }
 }
 
 // Monta a URL curta do Plano de Negócio (?view=plano&rep=...&ro=1) a partir
