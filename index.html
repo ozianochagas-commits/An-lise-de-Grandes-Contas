@@ -1768,10 +1768,13 @@ function addClientToPreview(){
     CLIENTS[currentModalRepIndex] = [];
   }
   
-  // Adiciona cliente com valor como NÚMERO
+  // Adiciona cliente com valor como NÚMERO. Já entra MARCADO: o campo
+  // CENÁRIO da tabela só soma clientes marcados, e antes o cliente novo
+  // entrava desmarcado — o valor não ia para a tabela e parecia não gravar.
   CLIENTS[currentModalRepIndex].push({
     name: clientName,
-    value: clientValue
+    value: clientValue,
+    selected: true
   });
   
   // Limpa inputs
@@ -1840,7 +1843,7 @@ function parseBulkClientesInput(texto){
       return;
     }
 
-    resultado.push({ name: nome, value: valor });
+    resultado.push({ name: nome, value: valor, selected: true });
   });
 
   return { resultado, erros };
@@ -2019,12 +2022,22 @@ function renderClientsList(){
     <span></span>`;
   listContainer.appendChild(foot);
 
-  // Atualiza total no modal de clientes
+  // Atualiza total no modal de clientes — mostra o mesmo valor que vai
+  // para o campo CENÁRIO da tabela (só os clientes marcados), para não
+  // dar a impressão de que o valor foi gravado quando não foi.
   if(modalTotal) {
     modalTotal.style.display = 'flex';
+    const somaMarcados = getTotalClientsPrevision(currentModalRepIndex);
     const spanTotal = modalTotal.querySelector('span:last-child');
     if(spanTotal) {
-      spanTotal.textContent = R(somaTotal);
+      spanTotal.textContent = R(somaMarcados);
+    }
+    const spanLabel = modalTotal.querySelector('span:first-child');
+    if(spanLabel) {
+      const desmarcados = clients.filter(c => !c.selected).length;
+      spanLabel.textContent = desmarcados
+        ? `Total Cenário Comercial (${desmarcados} cliente(s) desmarcado(s) não entram na soma):`
+        : 'Total Cenário Comercial:';
     }
   }
 }
