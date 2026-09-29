@@ -2571,7 +2571,7 @@ function buildDashTable(vals){
     tbody.innerHTML+=`<tr>
       <td style="font-weight:700">${r.name}</td><td>${R(r.meta)}</td>
       <td style="color:var(--orange);font-weight:600">${R(r.real)}</td>
-      <td style="color:#888;position:relative;" class="client-tooltip-cell" onmouseover="showClientTooltip(${repIdx}, event)" onmouseout="hideClientTooltip()">${R(r.prev)}<div class="client-tooltip" id="tooltip-${repIdx}" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%, -50%);background:white;border:3px solid var(--orange);border-radius:10px;padding:12px 32px 12px 12px;z-index:1000;width:420px;height:500px;overflow-y:scroll;overflow-x:hidden;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:9px;font-weight:500;color:#333;pointer-events:auto;"></div></td>
+      <td style="color:#888;position:relative;" class="client-tooltip-cell" onmouseover="showClientTooltip(${repIdx}, event)">${R(r.prev)}<div class="client-tooltip" id="tooltip-${repIdx}" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%, -50%);background:white;border:3px solid var(--orange);border-radius:10px;padding:12px 32px 12px 12px;z-index:1000;width:420px;height:500px;overflow-y:scroll;overflow-x:hidden;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:9px;font-weight:500;color:#333;pointer-events:auto;"></div></td>
       <td style="color:#558B2F;font-weight:600">${R(r.car)}</td>
       <td style="font-weight:700">${R(proj)}</td>
       <td><div style="font-weight:700">${P(atp)}</div><div class="pwrap"><div class="pbar" style="width:${Math.min(atp*100,100)}%;background:var(--dark)"></div></div></td>
@@ -2618,6 +2618,10 @@ function buildCenarioDetalhe(vals){
 function showClientTooltip(repIdx, event){
   const tooltip = $('tooltip-'+repIdx);
   if(!tooltip) return;
+  // Já aberto: não reconstrói (senão a rolagem volta para o topo a cada
+  // movimento do mouse dentro da lista).
+  if(tooltip.style.display === 'block') return;
+  hideClientTooltip();
 
   const clients = CLIENTS[repIdx] || [];
   // FILTRA apenas clientes SELECIONADOS
@@ -2652,6 +2656,15 @@ function hideClientTooltip(){
   const tooltips = document.querySelectorAll('.client-tooltip');
   tooltips.forEach(t => t.style.display = 'none');
 }
+
+// A lista abre ao passar o mouse e FICA aberta, para dar para rolar e ler
+// com calma; fecha ao clicar fora dela (ou com Esc).
+document.addEventListener('click', e => {
+  if(!e.target.closest('.client-tooltip')) hideClientTooltip();
+});
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape') hideClientTooltip();
+});
 
 // Ranking: selectedIdx=-1 mostra todos; selectedIdx>=0 mostra APENAS o selecionado
 function buildRanking(vals, selectedIdx){
