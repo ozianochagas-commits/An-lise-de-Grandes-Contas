@@ -721,7 +721,8 @@
         .select('id,representante_id');
       if (error) throw error;
       console.log('✅ Dados mensais sincronizados com o Supabase para', mes);
-      registrarAuditoria('Editou dados do mês', mes.slice(0,7), 'mensal-'+mes);
+      // Só registra quando a pessoa digitou na tabela (não a sincronização automática ao abrir)
+      if(window.__editouMensal){ window.__editouMensal = false; registrarAuditoria('Editou dados do mês', mes.slice(0,7), 'mensal-'+mes); }
 
       // Com o id de cada linha salva, sobe também a relação de clientes
       // do Cenário Comercial (a lista usada no PDF), ligada ao mês certo.
@@ -869,6 +870,13 @@
     }catch(e){}
   }
 
+  // Marca edição feita pela pessoa (digitando nas tabelas Editar Dados / Trimestre)
+  document.addEventListener('input', e => {
+    if(!e.isTrusted || !e.target.closest) return;
+    if(e.target.closest('.edit-row')) window.__editouMensal = true;
+    if(e.target.closest('.trim-row')) window.__editouTrim = true;
+  });
+
   // Debounce: espera o usuário parar de digitar antes de gravar na nuvem,
   // para não disparar uma escrita a cada tecla pressionada.
   let __syncDadosMensaisTimer = null;
@@ -966,7 +974,7 @@
         .upsert(rows, { onConflict: 'representante_id,trimestre,ano' });
       if (error) throw error;
       console.log('✅ Dados trimestrais sincronizados com o Supabase para trimestre', numTri, ano);
-      registrarAuditoria('Editou dados do trimestre', numTri + 'º trimestre de ' + ano, 'trim-'+numTri+'-'+ano);
+      if(window.__editouTrim){ window.__editouTrim = false; registrarAuditoria('Editou dados do trimestre', numTri + 'º trimestre de ' + ano, 'trim-'+numTri+'-'+ano); }
       return { cloud: true };
     } catch (err) {
       console.error('❌ Dados trimestrais salvos localmente, mas o Supabase recusou a sincronização:', err);
