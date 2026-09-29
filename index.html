@@ -37,6 +37,29 @@
   #usuario-select option{background:#fff;color:#222;font-weight:700;}
   #usuario-regiao{font-size:10px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,.65);text-transform:uppercase;}
   @media(max-width:600px){ .usuario-box{margin-left:0;width:100%;} #usuario-select{flex:1;} }
+  #usuarios-online{display:flex;align-items:center;}
+  #usuarios-online .uo-av{position:relative;width:32px;height:32px;border-radius:50%;margin-left:-6px;border:2px solid var(--dark);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:13px;cursor:default;}
+  #usuarios-online .uo-av:first-child{margin-left:0;}
+  #usuarios-online .uo-av::after{content:'';position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;
+    background:#2ECC40;border:2px solid var(--dark);}
+  #usuarios-online .uo-av.eu{outline:2px solid var(--orange);outline-offset:1px;}
+  #btn-config{background:transparent;border:2px solid rgba(255,255,255,.35);border-radius:8px;width:40px;height:40px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;flex-shrink:0;transition:all .2s;}
+  #btn-config:hover{border-color:var(--orange);color:var(--orange);transform:rotate(45deg);}
+  #modal-config{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:16px;}
+  #modal-config.on{display:flex;}
+  #modal-config .mc-box{background:#fff;border-radius:12px;max-width:460px;width:100%;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.3);}
+  #modal-config .mc-h{background:var(--orange);color:#fff;padding:16px 20px;font-size:17px;font-weight:900;display:flex;justify-content:space-between;align-items:center;}
+  #modal-config .mc-h button{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;}
+  #modal-config .mc-b{padding:18px 20px 20px;}
+  #modal-config .mc-b p{font-size:12px;color:#777;margin-bottom:14px;}
+  #modal-config .mc-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #eee;}
+  #modal-config .mc-row b{font-size:14px;}
+  #modal-config select{padding:8px 10px;border:2px solid #ddd;border-radius:8px;font-weight:700;font-size:12px;min-width:210px;}
+  #modal-config .mc-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;}
+  #modal-config .mc-foot button{border:none;border-radius:8px;padding:11px 18px;font-weight:800;font-size:13px;cursor:pointer;}
+  @media(max-width:600px){ #modal-config select{min-width:0;flex:1;} }
   #modal-usuario{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:16px;}
   #modal-usuario.on{display:flex;}
   #modal-usuario .mu-box{background:#fff;border-radius:12px;max-width:420px;width:100%;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.3);}
@@ -983,6 +1006,25 @@
       <option value="Gustavo">Gustavo</option>
     </select>
     <span id="usuario-regiao"></span>
+    <div id="usuarios-online" title="Quem está online agora"></div>
+    <button id="btn-config" type="button" onclick="abrirConfig()" title="Configurações: o que cada usuário pode ver">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Configurações (engrenagem): o que cada usuário pode ver -->
+<div id="modal-config" onclick="if(event.target===this) fecharConfig()">
+  <div class="mc-box">
+    <div class="mc-h"><span>⚙️ Configurações</span><button type="button" onclick="fecharConfig()">&times;</button></div>
+    <div class="mc-b">
+      <p>Escolha o que cada usuário pode ver. "Tudo" mostra todos os representantes. A configuração fica salva online e vale para todos os aparelhos.</p>
+      <div id="mc-lista"></div>
+      <div class="mc-foot">
+        <button type="button" style="background:#eee;color:#333;" onclick="fecharConfig()">Cancelar</button>
+        <button type="button" style="background:var(--orange);color:#fff;" onclick="salvarConfig()">Salvar</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1854,10 +1896,13 @@ function addClientToPreview(){
     CLIENTS[currentModalRepIndex] = [];
   }
   
-  // Adiciona cliente com valor como NÚMERO
+  // Adiciona cliente com valor como NÚMERO. Já entra MARCADO: o campo
+  // CENÁRIO da tabela só soma clientes marcados, e antes o cliente novo
+  // entrava desmarcado — o valor não ia para a tabela e parecia não gravar.
   CLIENTS[currentModalRepIndex].push({
     name: clientName,
-    value: clientValue
+    value: clientValue,
+    selected: true
   });
   
   // Limpa inputs
@@ -1926,7 +1971,7 @@ function parseBulkClientesInput(texto){
       return;
     }
 
-    resultado.push({ name: nome, value: valor });
+    resultado.push({ name: nome, value: valor, selected: true });
   });
 
   return { resultado, erros };
@@ -2105,12 +2150,22 @@ function renderClientsList(){
     <span></span>`;
   listContainer.appendChild(foot);
 
-  // Atualiza total no modal de clientes
+  // Atualiza total no modal de clientes — mostra o mesmo valor que vai
+  // para o campo CENÁRIO da tabela (só os clientes marcados), para não
+  // dar a impressão de que o valor foi gravado quando não foi.
   if(modalTotal) {
     modalTotal.style.display = 'flex';
+    const somaMarcados = getTotalClientsPrevision(currentModalRepIndex);
     const spanTotal = modalTotal.querySelector('span:last-child');
     if(spanTotal) {
-      spanTotal.textContent = R(somaTotal);
+      spanTotal.textContent = R(somaMarcados);
+    }
+    const spanLabel = modalTotal.querySelector('span:first-child');
+    if(spanLabel) {
+      const desmarcados = clients.filter(c => !c.selected).length;
+      spanLabel.textContent = desmarcados
+        ? `Total Cenário Comercial (${desmarcados} cliente(s) desmarcado(s) não entram na soma):`
+        : 'Total Cenário Comercial:';
     }
   }
 }
@@ -2515,6 +2570,9 @@ function renderEditTable(){
         <td id="row-st-${i}"><span class="badge ${bg.c}">${bg.t}</span></td>
       </tr>`;
   });
+  // Esconde as linhas fora do filtro/região do usuário (senão a tabela
+  // abre mostrando todos os representantes, mesmo com a região escolhida).
+  applyFilterVisibility();
 }
 
 // ── RENDER EDITABLE TRIMESTRE TABLE ────────────────────────────
@@ -2541,6 +2599,7 @@ function renderTrimTable(){
         <td id="t-st-${i}"><span class="badge ${bg.c}">${bg.t}</span></td>
       </tr>`;
   });
+  applyFilterVisibility();   // idem: só os representantes do filtro/região
 }
 
 // ── HELPERS DE RENDER (reutilizados pelo filtro e pelo recalc) ──
@@ -2558,7 +2617,7 @@ function buildDashTable(vals){
     tbody.innerHTML+=`<tr>
       <td style="font-weight:700">${r.name}</td><td>${R(r.meta)}</td>
       <td style="color:var(--orange);font-weight:600">${R(r.real)}</td>
-      <td style="color:#888;position:relative;" class="client-tooltip-cell" onmouseover="showClientTooltip(${repIdx}, event)" onmouseout="hideClientTooltip()">${R(r.prev)}<div class="client-tooltip" id="tooltip-${repIdx}" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%, -50%);background:white;border:3px solid var(--orange);border-radius:10px;padding:12px 32px 12px 12px;z-index:1000;width:420px;height:500px;overflow-y:scroll;overflow-x:hidden;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:9px;font-weight:500;color:#333;pointer-events:auto;"></div></td>
+      <td style="color:#888;position:relative;" class="client-tooltip-cell" onmouseover="showClientTooltip(${repIdx}, event)">${R(r.prev)}<div class="client-tooltip" id="tooltip-${repIdx}" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%, -50%);background:white;border:3px solid var(--orange);border-radius:10px;padding:12px 32px 12px 12px;z-index:1000;width:420px;height:500px;overflow-y:scroll;overflow-x:hidden;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:9px;font-weight:500;color:#333;pointer-events:auto;"></div></td>
       <td style="color:#558B2F;font-weight:600">${R(r.car)}</td>
       <td style="font-weight:700">${R(proj)}</td>
       <td><div style="font-weight:700">${P(atp)}</div><div class="pwrap"><div class="pbar" style="width:${Math.min(atp*100,100)}%;background:var(--dark)"></div></div></td>
@@ -2605,6 +2664,10 @@ function buildCenarioDetalhe(vals){
 function showClientTooltip(repIdx, event){
   const tooltip = $('tooltip-'+repIdx);
   if(!tooltip) return;
+  // Já aberto: não reconstrói (senão a rolagem volta para o topo a cada
+  // movimento do mouse dentro da lista).
+  if(tooltip.style.display === 'block') return;
+  hideClientTooltip();
 
   const clients = CLIENTS[repIdx] || [];
   // FILTRA apenas clientes SELECIONADOS
@@ -2639,6 +2702,15 @@ function hideClientTooltip(){
   const tooltips = document.querySelectorAll('.client-tooltip');
   tooltips.forEach(t => t.style.display = 'none');
 }
+
+// A lista abre ao passar o mouse e FICA aberta, para dar para rolar e ler
+// com calma; fecha ao clicar fora dela (ou com Esc).
+document.addEventListener('click', e => {
+  if(!e.target.closest('.client-tooltip')) hideClientTooltip();
+});
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape') hideClientTooltip();
+});
 
 // Ranking: selectedIdx=-1 mostra todos; selectedIdx>=0 mostra APENAS o selecionado
 function buildRanking(vals, selectedIdx){
@@ -2948,15 +3020,25 @@ function carregarCliente360(){
 // para o viajante da agenda acompanhar o usuário do sistema.
 const USUARIOS_SISTEMA = ['Oziano','Samuel','Beto','Pamela','Gustavo'];
 const CHAVE_USUARIO_SISTEMA = 'agenda_usuario_eu';
-const REGIAO_DO_USUARIO = {Oziano:'NN', Samuel:'NN', Pamela:'SS', Beto:'BR', Gustavo:'BR'};
+// Padrão; pode ser alterado na engrenagem ⚙️ (Configurações), que salva
+// online (tabela "configuracoes" do Supabase) e guarda cópia no aparelho.
+const REGIAO_PADRAO_DO_USUARIO = {Oziano:'NN', Samuel:'NN', Pamela:'SS', Beto:'BR', Gustavo:'BR'};
+const REGIAO_DO_USUARIO = Object.assign({}, REGIAO_PADRAO_DO_USUARIO);
+const CHAVE_CONFIG_REGIOES = 'config_regiao_usuarios';
+function aplicarConfigRegioes(cfg){
+  if(!cfg || typeof cfg !== 'object') return;
+  USUARIOS_SISTEMA.forEach(u => { if(REGIOES[cfg[u]]) REGIAO_DO_USUARIO[u] = cfg[u]; });
+}
 const REGIOES = {
   NN: {nome:'Norte e Nordeste', titulo:'NORTE &nbsp;•&nbsp; NORDESTE &nbsp;•&nbsp; RIO',
        reps:['ATIVA REPRESENTAÇÕES','RBR REPRESENTAÇÕES','IG REPRESENTAÇÕES','PEREIRA MEDINA AM','PEREIRA MEDINA (AP e PA)']},
   SS: {nome:'Sul e Sudeste', titulo:'SUL &nbsp;•&nbsp; SUDESTE',
        reps:['ALCA REPRESENTAÇÕES','CONVERT REPRESENTAÇÕES','BROCK REPRESENTAÇÕES','PROATIVA REPRESENTAÇÕES',
              'DIRETO SC','DIRETO RS','MARK PRESS REPRESENTAÇÕES','JUNIORCAR REPRESENTAÇÕES']},
-  BR: {nome:'Brasil', titulo:'BRASIL', reps:null}   // null = todos os representantes
+  BR: {nome:'Tudo (Brasil)', titulo:'BRASIL', reps:null}   // null = todos os representantes
 };
+// Cópia local da configuração (vale até chegar a versão online)
+try{ aplicarConfigRegioes(JSON.parse(localStorage.getItem(CHAVE_CONFIG_REGIOES) || 'null')); }catch(e){}
 let __regiaoDesligada = false;   // link compartilhado: mostra o retrato do link, sem região
 function usuarioSistema(){
   try{ const u = localStorage.getItem(CHAVE_USUARIO_SISTEMA); return USUARIOS_SISTEMA.includes(u) ? u : null; }
@@ -3000,6 +3082,8 @@ function trocarUsuarioSistema(u){
   // Agenda e Cliente 360 (mesmo domínio): atualiza na hora se já estiverem abertos
   try{ const a = $('agenda-frame'); if(a && a.contentWindow && typeof a.contentWindow.escolherUsuario === 'function') a.contentWindow.escolherUsuario(u); }catch(e){}
   try{ const c = $('cliente360-frame'); if(c && c.contentWindow && typeof c.contentWindow.atualizarSelectGrupos === 'function') c.contentWindow.atualizarSelectGrupos(); }catch(e){}
+  anunciarPresenca();
+  renderUsuariosOnline();
   showNotification(`👤 ${u} — ${regiaoAtual().nome}`);
 }
 function abrirModalUsuario(){
@@ -3007,6 +3091,91 @@ function abrirModalUsuario(){
   g.innerHTML = USUARIOS_SISTEMA.map(u =>
     `<button onclick="trocarUsuarioSistema('${u}')">${u}<small>${REGIOES[REGIAO_DO_USUARIO[u]].nome.toUpperCase()}</small></button>`).join('');
   $('modal-usuario').classList.add('on');
+}
+
+// ── QUEM ESTÁ ONLINE (carinhas ao lado da engrenagem) ─────────
+// Usa a "presença" em tempo real do Supabase: cada aba aberta anuncia o
+// usuário escolhido e todo mundo vê as bolinhas de quem está usando agora.
+// Não grava nada no banco — some sozinho quando a pessoa fecha o site.
+const CORES_USUARIO = {Oziano:'#FE5000', Samuel:'#2980B9', Beto:'#8E44AD', Pamela:'#D81B60', Gustavo:'#16A085'};
+let __canalPresenca = null;
+function idDesteAparelho(){
+  try{
+    let id = sessionStorage.getItem('presenca_id');
+    if(!id){ id = Math.random().toString(36).slice(2) + Date.now().toString(36); sessionStorage.setItem('presenca_id', id); }
+    return id;
+  }catch(e){ return Math.random().toString(36).slice(2); }
+}
+function renderUsuariosOnline(){
+  const box = $('usuarios-online'); if(!box || !__canalPresenca) return;
+  const online = new Set();
+  Object.values(__canalPresenca.presenceState()).forEach(lista =>
+    (lista || []).forEach(p => { if(USUARIOS_SISTEMA.includes(p.usuario)) online.add(p.usuario); }));
+  const eu = usuarioSistema();
+  box.innerHTML = USUARIOS_SISTEMA.filter(u => online.has(u)).map(u =>
+    `<div class="uo-av${u === eu ? ' eu' : ''}" style="background:${CORES_USUARIO[u] || '#555'}" title="${u} — online agora${u === eu ? ' (você)' : ''}">${u[0]}</div>`).join('');
+  // No seletor de usuário, marca quem está online
+  const sel = $('usuario-select');
+  if(sel) Array.from(sel.options).forEach(o => { o.textContent = (online.has(o.value) ? '🟢 ' : '') + o.value; });
+}
+function anunciarPresenca(){
+  const u = usuarioSistema();
+  if(__canalPresenca && u) __canalPresenca.track({ usuario: u, desde: new Date().toISOString() }).catch(() => {});
+}
+function iniciarPresenca(){
+  try{
+    initSupabase();
+    if(!window.supabaseClient || __canalPresenca) return;
+    __canalPresenca = window.supabaseClient.channel('usuarios-online', { config: { presence: { key: idDesteAparelho() } } });
+    __canalPresenca
+      .on('presence', { event: 'sync' }, renderUsuariosOnline)
+      .subscribe(status => { if(status === 'SUBSCRIBED') anunciarPresenca(); });
+  }catch(e){ console.warn('⚠️ Não foi possível mostrar quem está online.', e); }
+}
+
+// ── CONFIGURAÇÕES (engrenagem ⚙️) ─────────────────────────────
+// Busca online o que cada usuário pode ver. Retorna true se mudou algo.
+async function carregarConfigRegioes(){
+  try{
+    initSupabase();
+    if(!window.supabaseClient) return false;
+    const { data, error } = await window.supabaseClient
+      .from('configuracoes').select('valor').eq('chave', CHAVE_CONFIG_REGIOES).maybeSingle();
+    if(error || !data || !data.valor) return false;
+    const antes = JSON.stringify(REGIAO_DO_USUARIO);
+    aplicarConfigRegioes(data.valor);
+    try{ localStorage.setItem(CHAVE_CONFIG_REGIOES, JSON.stringify(REGIAO_DO_USUARIO)); }catch(e){}
+    return JSON.stringify(REGIAO_DO_USUARIO) !== antes;
+  }catch(e){ return false; }
+}
+function abrirConfig(){
+  const opts = Object.keys(REGIOES).map(k => `<option value="${k}">${REGIOES[k].nome}</option>`).join('');
+  $('mc-lista').innerHTML = USUARIOS_SISTEMA.map(u =>
+    `<div class="mc-row"><b>${u}</b><select id="mc-${u}">${opts}</select></div>`).join('');
+  USUARIOS_SISTEMA.forEach(u => { $('mc-'+u).value = REGIAO_DO_USUARIO[u]; });
+  $('modal-config').classList.add('on');
+}
+function fecharConfig(){ $('modal-config').classList.remove('on'); }
+async function salvarConfig(){
+  const cfg = {};
+  USUARIOS_SISTEMA.forEach(u => { cfg[u] = $('mc-'+u).value; });
+  aplicarConfigRegioes(cfg);
+  try{ localStorage.setItem(CHAVE_CONFIG_REGIOES, JSON.stringify(cfg)); }catch(e){}
+  fecharConfig();
+  // Reaplica na hora para o usuário atual
+  const u = usuarioSistema();
+  if(u) trocarUsuarioSistema(u); else { aplicarRegiaoNosFiltros(); applyFilter(); }
+  let online = false;
+  try{
+    initSupabase();
+    if(window.supabaseClient){
+      const { error } = await window.supabaseClient.from('configuracoes')
+        .upsert({ chave: CHAVE_CONFIG_REGIOES, valor: cfg, updated_at: new Date().toISOString() }, { onConflict: 'chave' });
+      online = !error;
+      if(error) console.error('❌ Configuração salva só neste aparelho:', error);
+    }
+  }catch(e){ console.error('❌ Configuração salva só neste aparelho:', e); }
+  showNotification(online ? '⚙️ Configuração salva para todos os aparelhos' : '⚠️ Configuração salva só neste aparelho (sem conexão)');
 }
 
 // ── FILTER ─────────────────────────────────────────────────────
@@ -7075,8 +7244,10 @@ async function initDashboard() {
   // Usuário do sistema → só os representantes da região dele (link compartilhado: sem região)
   __regiaoDesligada = !!shared;
   if(shared){ const ub = $('usuario-box'); if(ub) ub.style.display = 'none'; }
+  if(!shared) await carregarConfigRegioes();   // o que cada usuário pode ver (engrenagem ⚙️)
   aplicarRegiaoNosFiltros();
   if(!shared && !usuarioSistema()) abrirModalUsuario();
+  if(!shared) iniciarPresenca();   // carinhas de quem está online
   // Abre SEMPRE no trimestre vigente (a edição salva nesse trimestre)
   if(!shared){ currentTrimestre = getVigenteTrimestre(); }
   aplicarTrimestreUI(currentTrimestre);
