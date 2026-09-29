@@ -38,12 +38,12 @@
   #usuario-regiao{font-size:10px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,.65);text-transform:uppercase;}
   @media(max-width:600px){ .usuario-box{margin-left:0;width:100%;} #usuario-select{flex:1;} }
   #usuarios-online{display:flex;align-items:center;}
-  #usuarios-online .uo-av{position:relative;width:32px;height:32px;border-radius:50%;margin-left:-6px;border:2px solid var(--dark);
-    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:13px;cursor:default;}
+  #usuarios-online .uo-av{position:relative;width:20px;height:20px;border-radius:50%;margin-left:-4px;border:1.5px solid var(--dark);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:9px;cursor:default;opacity:.85;}
   #usuarios-online .uo-av:first-child{margin-left:0;}
-  #usuarios-online .uo-av::after{content:'';position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;
-    background:#2ECC40;border:2px solid var(--dark);}
-  #usuarios-online .uo-av.eu{outline:2px solid var(--orange);outline-offset:1px;}
+  #usuarios-online .uo-av:hover{opacity:1;}
+  #usuarios-online .uo-av::after{content:'';position:absolute;right:-2px;bottom:-2px;width:6px;height:6px;border-radius:50%;
+    background:#2ECC40;border:1.5px solid var(--dark);}
   #btn-config{background:transparent;border:2px solid rgba(255,255,255,.35);border-radius:8px;width:40px;height:40px;
     display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;flex-shrink:0;transition:all .2s;}
   #btn-config:hover{border-color:var(--orange);color:var(--orange);transform:rotate(45deg);}
@@ -57,6 +57,19 @@
   #modal-config .mc-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #eee;}
   #modal-config .mc-row b{font-size:14px;}
   #modal-config select{padding:8px 10px;border:2px solid #ddd;border-radius:8px;font-weight:700;font-size:12px;min-width:210px;}
+  #modal-config .mc-box.largo{max-width:820px;}
+  #modal-config .mc-tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:2px solid #eee;}
+  #modal-config .mc-tab{background:none;border:none;border-bottom:3px solid transparent;margin-bottom:-2px;padding:8px 12px;
+    font-weight:800;font-size:12px;color:#888;cursor:pointer;}
+  #modal-config .mc-tab.on{color:var(--orange);border-bottom-color:var(--orange);}
+  #mc-trilha .mt-bar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+  #mc-trilha .mt-bar select{min-width:150px;}
+  #mc-trilha .mt-lista{max-height:52vh;overflow:auto;border:1px solid #eee;border-radius:8px;}
+  #mc-trilha table{width:100%;border-collapse:collapse;font-size:11px;}
+  #mc-trilha th{position:sticky;top:0;background:#1C1C1C;color:#fff;text-align:left;padding:7px 9px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;}
+  #mc-trilha td{padding:6px 9px;border-bottom:1px solid #f0f0f0;vertical-align:top;text-align:left;}
+  #mc-trilha td.quando{white-space:nowrap;color:#777;}
+  #mc-trilha .vazio{padding:24px;text-align:center;color:#999;font-size:12px;}
   #modal-config .mc-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;}
   #modal-config .mc-foot button{border:none;border-radius:8px;padding:11px 18px;font-weight:800;font-size:13px;cursor:pointer;}
   @media(max-width:600px){ #modal-config select{min-width:0;flex:1;} }
@@ -708,6 +721,7 @@
         .select('id,representante_id');
       if (error) throw error;
       console.log('✅ Dados mensais sincronizados com o Supabase para', mes);
+      registrarAuditoria('Editou dados do mês', mes.slice(0,7), 'mensal-'+mes);
 
       // Com o id de cada linha salva, sobe também a relação de clientes
       // do Cenário Comercial (a lista usada no PDF), ligada ao mês certo.
@@ -831,6 +845,30 @@
     return true;
   }
 
+  // ── TRILHA DE AUDITORIA ─────────────────────────────────────────
+  // Anota no Supabase (tabela "trilha_auditoria") quem fez o quê e quando.
+  // Só registra; ninguém edita nem apaga pelo site. "chaveLimite" evita
+  // encher a trilha com a mesma ação repetida (ex.: cada tecla numa edição):
+  // a mesma chave só é registrada de novo depois de 5 minutos.
+  const __ultimoRegistroAuditoria = {};
+  function registrarAuditoria(acao, detalhe, chaveLimite){
+    try{
+      if(window.__linkCompartilhado) return;   // quem abre link compartilhado não entra na trilha
+      if(chaveLimite){
+        const agora = Date.now();
+        if(__ultimoRegistroAuditoria[chaveLimite] && agora - __ultimoRegistroAuditoria[chaveLimite] < 5*60*1000) return;
+        __ultimoRegistroAuditoria[chaveLimite] = agora;
+      }
+      initSupabase();
+      if(!window.supabaseClient) return;
+      const usuario = (typeof usuarioSistema === 'function' && usuarioSistema()) || '(sem usuário)';
+      const aparelho = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'Celular' : 'Computador';
+      window.supabaseClient.from('trilha_auditoria')
+        .insert({ usuario, acao, detalhe: detalhe || null, aparelho })
+        .then(({ error }) => { if(error) console.warn('⚠️ Trilha de auditoria não registrada:', error.message); });
+    }catch(e){}
+  }
+
   // Debounce: espera o usuário parar de digitar antes de gravar na nuvem,
   // para não disparar uma escrita a cada tecla pressionada.
   let __syncDadosMensaisTimer = null;
@@ -928,6 +966,7 @@
         .upsert(rows, { onConflict: 'representante_id,trimestre,ano' });
       if (error) throw error;
       console.log('✅ Dados trimestrais sincronizados com o Supabase para trimestre', numTri, ano);
+      registrarAuditoria('Editou dados do trimestre', numTri + 'º trimestre de ' + ano, 'trim-'+numTri+'-'+ano);
       return { cloud: true };
     } catch (err) {
       console.error('❌ Dados trimestrais salvos localmente, mas o Supabase recusou a sincronização:', err);
@@ -1018,11 +1057,29 @@
   <div class="mc-box">
     <div class="mc-h"><span>⚙️ Configurações</span><button type="button" onclick="fecharConfig()">&times;</button></div>
     <div class="mc-b">
-      <p>Escolha o que cada usuário pode ver. "Tudo" mostra todos os representantes. A configuração fica salva online e vale para todos os aparelhos.</p>
-      <div id="mc-lista"></div>
-      <div class="mc-foot">
-        <button type="button" style="background:#eee;color:#333;" onclick="fecharConfig()">Cancelar</button>
-        <button type="button" style="background:var(--orange);color:#fff;" onclick="salvarConfig()">Salvar</button>
+      <div class="mc-tabs">
+        <button type="button" class="mc-tab on" id="mc-tab-acesso" onclick="abaConfig('acesso')">👤 Acesso por usuário</button>
+        <button type="button" class="mc-tab" id="mc-tab-trilha" onclick="abaConfig('trilha')">📜 Trilha de auditoria</button>
+      </div>
+      <div id="mc-acesso">
+        <p>Escolha o que cada usuário pode ver. "Tudo" mostra todos os representantes. A configuração fica salva online e vale para todos os aparelhos.</p>
+        <div id="mc-lista"></div>
+        <div class="mc-foot">
+          <button type="button" style="background:#eee;color:#333;" onclick="fecharConfig()">Cancelar</button>
+          <button type="button" style="background:var(--orange);color:#fff;" onclick="salvarConfig()">Salvar</button>
+        </div>
+      </div>
+      <div id="mc-trilha" style="display:none;">
+        <div class="mt-bar">
+          <select id="mt-usuario" onchange="carregarTrilha()"><option value="">Todos os usuários</option></select>
+          <select id="mt-periodo" onchange="carregarTrilha()">
+            <option value="1">Hoje</option>
+            <option value="7" selected>Últimos 7 dias</option>
+            <option value="30">Últimos 30 dias</option>
+          </select>
+          <button type="button" style="background:#eee;color:#333;padding:8px 12px;" onclick="carregarTrilha()">↻ Atualizar</button>
+        </div>
+        <div class="mt-lista" id="mt-lista"></div>
       </div>
     </div>
   </div>
@@ -1927,6 +1984,7 @@ function addClientToPreview(){
   recalc();
   
   // Mostra notificação de sucesso
+  registrarAuditoria('Adicionou cliente no Cenário', `${BASE[currentModalRepIndex].name}: ${clientName} (${fmtN(clientValue)})`);
   showNotification('✓ Cliente adicionado com sucesso!');
 }
 
@@ -2002,6 +2060,7 @@ function addClientesEmMassa(){
   saveData();
   recalc();
 
+  registrarAuditoria('Adicionou clientes no Cenário', `${BASE[currentModalRepIndex].name}: ${resultado.length} cliente(s) colados de uma vez`);
   let msg = `✓ ${resultado.length} cliente(s) adicionado(s) com sucesso!`;
   if(erros.length) msg += ` — ${erros.length} linha(s) não reconhecida(s)`;
   showNotification(msg);
@@ -2056,7 +2115,9 @@ function toggleSelectAllClients(marcar){
 
 function removeClient(clientIdx){
   if(currentModalRepIndex < 0) return;
+  const removido = CLIENTS[currentModalRepIndex][clientIdx];
   CLIENTS[currentModalRepIndex].splice(clientIdx, 1);
+  if(removido) registrarAuditoria('Removeu cliente do Cenário', `${BASE[currentModalRepIndex].name}: ${removido.name} (${fmtN(toNumber(removido.value))})`);
   renderClientsList();
   // Atualiza campo de previsão com APENAS a soma dos clientes
   const totalClients = getTotalClientsPrevision(currentModalRepIndex);
@@ -2986,6 +3047,8 @@ function showTab(el,id){
 
 // Navega a partir da lista suspensa (usa a aba oculta correspondente)
 function navFromSelect(id){
+  const opt = document.querySelector('#nav-select option[value="'+id+'"]');
+  registrarAuditoria('Abriu seção', opt ? opt.textContent.replace(/^[^A-Za-zÀ-ú]+/, '').trim() : id);
   const t = Array.from(document.querySelectorAll('.tab')).find(t => (t.getAttribute('onclick')||'').indexOf("'"+id+"'") >= 0);
   if(t) showTab(t, id);
 }
@@ -3072,6 +3135,7 @@ function aplicarRegiaoNosFiltros(){
 // Troca o usuário: salva, aplica a região em todas as seções e avisa Agenda/Cliente 360.
 function trocarUsuarioSistema(u){
   if(!USUARIOS_SISTEMA.includes(u)) return;
+  const anterior = usuarioSistema();
   try{ localStorage.setItem(CHAVE_USUARIO_SISTEMA, u); }catch(e){}
   const m = $('modal-usuario'); if(m) m.classList.remove('on');
   aplicarRegiaoNosFiltros();
@@ -3084,6 +3148,7 @@ function trocarUsuarioSistema(u){
   try{ const c = $('cliente360-frame'); if(c && c.contentWindow && typeof c.contentWindow.atualizarSelectGrupos === 'function') c.contentWindow.atualizarSelectGrupos(); }catch(e){}
   anunciarPresenca();
   renderUsuariosOnline();
+  if(anterior !== u) registrarAuditoria('Trocou de usuário', `${anterior || '(nenhum)'} → ${u}`);
   showNotification(`👤 ${u} — ${regiaoAtual().nome}`);
 }
 function abrirModalUsuario(){
@@ -3113,7 +3178,7 @@ function renderUsuariosOnline(){
     (lista || []).forEach(p => { if(USUARIOS_SISTEMA.includes(p.usuario)) online.add(p.usuario); }));
   const eu = usuarioSistema();
   box.innerHTML = USUARIOS_SISTEMA.filter(u => online.has(u)).map(u =>
-    `<div class="uo-av${u === eu ? ' eu' : ''}" style="background:${CORES_USUARIO[u] || '#555'}" title="${u} — online agora${u === eu ? ' (você)' : ''}">${u[0]}</div>`).join('');
+    `<div class="uo-av" style="background:${CORES_USUARIO[u] || '#555'}" title="${u} — online agora${u === eu ? ' (você)' : ''}">${u[0]}</div>`).join('');
   // No seletor de usuário, marca quem está online
   const sel = $('usuario-select');
   if(sel) Array.from(sel.options).forEach(o => { o.textContent = (online.has(o.value) ? '🟢 ' : '') + o.value; });
@@ -3155,7 +3220,48 @@ function abrirConfig(){
   USUARIOS_SISTEMA.forEach(u => { $('mc-'+u).value = REGIAO_DO_USUARIO[u]; });
   $('modal-config').classList.add('on');
 }
-function fecharConfig(){ $('modal-config').classList.remove('on'); }
+function fecharConfig(){ $('modal-config').classList.remove('on'); abaConfig('acesso'); }
+function abaConfig(qual){
+  const trilha = qual === 'trilha';
+  $('mc-acesso').style.display = trilha ? 'none' : '';
+  $('mc-trilha').style.display = trilha ? '' : 'none';
+  $('mc-tab-acesso').classList.toggle('on', !trilha);
+  $('mc-tab-trilha').classList.toggle('on', trilha);
+  document.querySelector('#modal-config .mc-box').classList.toggle('largo', trilha);
+  if(trilha){
+    const sel = $('mt-usuario');
+    if(sel.options.length === 1) USUARIOS_SISTEMA.forEach(u => sel.add(new Option(u, u)));
+    carregarTrilha();
+  }
+}
+function escHtml(t){ return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+async function carregarTrilha(){
+  const box = $('mt-lista');
+  box.innerHTML = '<div class="vazio">Carregando…</div>';
+  try{
+    initSupabase();
+    if(!window.supabaseClient) throw new Error('sem conexão');
+    const dias = parseInt($('mt-periodo').value) || 7;
+    const desde = new Date(); desde.setHours(0,0,0,0); desde.setDate(desde.getDate() - (dias - 1));
+    let q = window.supabaseClient.from('trilha_auditoria')
+      .select('created_at,usuario,acao,detalhe,aparelho')
+      .gte('created_at', desde.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(500);
+    const u = $('mt-usuario').value;
+    if(u) q = q.eq('usuario', u);
+    const { data, error } = await q;
+    if(error) throw error;
+    if(!data || !data.length){ box.innerHTML = '<div class="vazio">Nenhum registro nesse período.</div>'; return; }
+    box.innerHTML = `<table><thead><tr><th>Quando</th><th>Usuário</th><th>Ação</th><th>Detalhe</th><th>Aparelho</th></tr></thead><tbody>` +
+      data.map(r => `<tr><td class="quando">${new Date(r.created_at).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>` +
+        `<td><b style="color:${CORES_USUARIO[r.usuario] || '#333'}">${escHtml(r.usuario)}</b></td><td>${escHtml(r.acao)}</td>` +
+        `<td>${escHtml(r.detalhe)}</td><td>${escHtml(r.aparelho)}</td></tr>`).join('') +
+      '</tbody></table>' + (data.length === 500 ? '<div class="vazio">Mostrando os 500 registros mais recentes.</div>' : '');
+  }catch(e){
+    box.innerHTML = '<div class="vazio">Não foi possível carregar a trilha agora (sem conexão).</div>';
+  }
+}
 async function salvarConfig(){
   const cfg = {};
   USUARIOS_SISTEMA.forEach(u => { cfg[u] = $('mc-'+u).value; });
@@ -3175,6 +3281,7 @@ async function salvarConfig(){
       if(error) console.error('❌ Configuração salva só neste aparelho:', error);
     }
   }catch(e){ console.error('❌ Configuração salva só neste aparelho:', e); }
+  registrarAuditoria('Alterou configuração de acesso', USUARIOS_SISTEMA.map(x => `${x}: ${REGIOES[cfg[x]].nome}`).join(' · '));
   showNotification(online ? '⚙️ Configuração salva para todos os aparelhos' : '⚠️ Configuração salva só neste aparelho (sem conexão)');
 }
 
@@ -3335,6 +3442,7 @@ function bdg(p){ return p>=1?{c:'batida',t:'META BATIDA'}:p>=0.8?{c:'risco',t:'E
 
 // ── EXPORT PDF ─────────────────────────────────────────────────
 function exportPDF(){
+  registrarAuditoria('Exportou PDF', (typeof currentTab !== 'undefined' ? currentTab : ''));
   // Pega índices selecionados
   const checkboxes = document.querySelectorAll('.rep-checkbox');
   const selectedIndices = Array.from(checkboxes)
@@ -6700,6 +6808,7 @@ async function empacotarLink(payload, repLabel){
 // aba (Dashboard, Editar Dados, Trimestre, etc.), pois o filtro e o
 // botão "Gerar Link" ficam na barra que aparece em todas elas.
 function gerarLinkCompartilhar(){
+  registrarAuditoria('Gerou link de compartilhamento', (typeof currentTab !== 'undefined' ? currentTab : ''));
   // Aba Plano de Negócio: os dados já vêm do Supabase, então o link não
   // precisa embutir nada — usa direto o link curto por parâmetro (?view=plano&rep=...),
   // sem depender de compressão nem de serviço externo (jsonblob/TinyURL).
@@ -6744,6 +6853,7 @@ function gerarLinkCompartilhar(){
 
 // Gera link SÓ do representante selecionado na aba Clientes Inativos
 function gerarLinkPorRep(){
+  registrarAuditoria('Gerou link de compartilhamento', 'Clientes Inativos');
   if(typeof LZString === 'undefined'){ alert('A biblioteca de compressão não carregou. Recarregue a página.'); return; }
   const sel = $('inativ-rep-select');
   const rep = sel ? sel.value : '';
@@ -7215,7 +7325,10 @@ function loadData(){
 async function initDashboard() {
   initSupabase();
   // 0. Verifica se a página foi aberta por um link compartilhado (#b= ou #d=)
+  // Link compartilhado não entra na trilha de auditoria (vale já durante o carregamento do link)
+  window.__linkCompartilhado = /[#&](s|b|d)=|[?&]view=/.test(location.hash + location.search);
   const shared = await carregarLinkCompartilhado();
+  window.__linkCompartilhado = !!shared;
 
   // 0.5. Verifica se tem parâmetro de mês na URL (?month=2026-09)
   const urlParams = new URLSearchParams(window.location.search);
@@ -7248,6 +7361,7 @@ async function initDashboard() {
   aplicarRegiaoNosFiltros();
   if(!shared && !usuarioSistema()) abrirModalUsuario();
   if(!shared) iniciarPresenca();   // carinhas de quem está online
+  if(!shared && usuarioSistema()) registrarAuditoria('Entrou no sistema');
   // Abre SEMPRE no trimestre vigente (a edição salva nesse trimestre)
   if(!shared){ currentTrimestre = getVigenteTrimestre(); }
   aplicarTrimestreUI(currentTrimestre);
