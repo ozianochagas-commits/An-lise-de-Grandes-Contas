@@ -319,7 +319,10 @@
   .rinfo{flex:1;}
   .rname{font-size:10px;font-weight:700;}
   .rval{font-size:9px;color:#888;margin-top:1px;}
-  .rpct{font-size:14px;font-weight:900;color:var(--orange);}
+  .rpct{font-size:14px;font-weight:900;color:var(--orange);min-width:64px;text-align:right;}
+  .rent{font-size:12px;font-weight:800;min-width:54px;text-align:right;padding-left:10px;border-left:1px solid #eee;}
+  .rrow.rhead{padding:0 0 4px;}
+  .rrow.rhead .rpct,.rrow.rhead .rent{font-size:8px;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.5px;}
 
   /* CHART */
   .chwrap{background:white;border-radius:0 0 8px 8px;box-shadow:0 2px 10px rgba(0,0,0,.08);overflow:hidden;margin-bottom:16px;}
@@ -2823,6 +2826,7 @@ function buildRanking(vals, selectedIdx){
         <div style="font-size:13px;font-weight:900;color:var(--dark)">${r.name}</div>
         <div style="font-size:10px;color:#888;margin:4px 0">${R(r.real)} faturado</div>
         <div style="font-size:32px;font-weight:900;color:var(--orange);margin:8px 0">${P(prj)}</div>
+        <div style="font-size:11px;color:#666;margin-bottom:8px">Entrega: ${htmlEntrega(r.real, r.car, true)}</div>
         <span class="badge ${badge(prj).c}" style="font-size:11px;padding:5px 14px">${badge(prj).t}</span>
       </div>
       <div style="padding:8px 12px;font-size:10px;color:#888;text-align:center">
@@ -2830,14 +2834,26 @@ function buildRanking(vals, selectedIdx){
       </div>`;
   } else {
     // Todos os representantes
-    [...vals].map((r,i)=>({name:r.name,real:r.real,prj:r.meta>0?(r.real+r.prev+r.car)/r.meta:0,idx:i}))
+    // Cabeçalho das duas colunas: % Projetado (ordena o ranking) e % de Entrega
+    ri.innerHTML=`<div class="rrow rhead"><div class="rinfo"></div><div class="rpct">Projetado</div><div class="rent">Entrega</div></div>`;
+    [...vals].map((r,i)=>({name:r.name,real:r.real,car:r.car,prj:r.meta>0?(r.real+r.prev+r.car)/r.meta:0,idx:i}))
       .sort((a,b)=>b.prj-a.prj).forEach((r,i)=>{
         const cls=['r1','r2','r3','rn','rn'][i],lbl=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'º';
         ri.innerHTML+=`<div class="rrow"><div class="rnum ${cls}">${lbl}</div>
           <div class="rinfo"><div class="rname">${r.name}</div><div class="rval">${R(r.real)} faturado</div></div>
-          <div class="rpct">${P(r.prj)}</div></div>`;
+          <div class="rpct">${P(r.prj)}</div>${htmlEntrega(r.real, r.car)}</div>`;
       });
   }
+}
+
+// % de entrega (Faturado ÷ (Faturado + Carteira)) para o ranking
+function htmlEntrega(real, car, soTexto){
+  const vendido = real + car;
+  const pct = vendido > 0 ? Math.round(real / vendido * 1000) / 1000 : 0;
+  const cor = pct >= 0.9 ? '#1E7E34' : (pct >= 0.75 ? '#D68910' : '#C0392B');
+  const txt = vendido > 0 ? P(pct) : '—';
+  if(soTexto) return `<b style="color:${cor}">${txt}</b>`;
+  return `<div class="rent" style="color:${cor}" title="Faturado ${R(real)} · Carteira ${R(car)}">${txt}</div>`;
 }
 
 function getRankPosition(vals, idx){
