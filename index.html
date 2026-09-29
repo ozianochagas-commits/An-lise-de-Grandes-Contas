@@ -378,6 +378,7 @@
   .entrega-grid .pcl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#888;opacity:1;}
   .entrega-grid .pcv{font-size:19px;}
   .entrega-grid .pcs{color:#999;opacity:1;}
+  @media(max-width:700px){ .entrega-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;} }
   .entrega-grid .en-bar{height:4px;background:#EFEFEF;border-radius:2px;overflow:hidden;margin:4px 0 6px;}
   .entrega-grid .en-bar div{height:100%;border-radius:2px;}
   .ibox li::before{content:'›';position:absolute;left:0;color:var(--orange);font-weight:900;}
@@ -2490,8 +2491,12 @@ function buildEntrega(lista){
   };
   let tR = 0, tC = 0;
   lista.forEach(r => { tR += r.real; tC += r.car; });
-  grid.innerHTML = (lista.length > 1 ? card('Total RIO', tR, tC, true) : '') +
-    lista.map(r => card(r.name, r.real, r.car, false)).join('');
+  // Total da RIO no fim (lado direito); as colunas se dividem igualmente para
+  // ocupar a largura toda, alinhadas com os quadrinhos de cima (até 6 por linha)
+  const qtd = lista.length + (lista.length > 1 ? 1 : 0);
+  grid.style.gridTemplateColumns = `repeat(${Math.max(1, Math.min(qtd, 6))}, minmax(0, 1fr))`;
+  grid.innerHTML = lista.map(r => card(r.name, r.real, r.car, false)).join('') +
+    (lista.length > 1 ? card('Total RIO', tR, tC, true) : '');
 }
 
 // ── RECALC MONTHLY ──────────────────────────────────────────────
