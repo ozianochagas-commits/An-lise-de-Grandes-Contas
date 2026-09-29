@@ -2528,6 +2528,9 @@ function renderEditTable(){
         <td id="row-st-${i}"><span class="badge ${bg.c}">${bg.t}</span></td>
       </tr>`;
   });
+  // Esconde as linhas fora do filtro/região do usuário (senão a tabela
+  // abre mostrando todos os representantes, mesmo com a região escolhida).
+  applyFilterVisibility();
 }
 
 // ── RENDER EDITABLE TRIMESTRE TABLE ────────────────────────────
@@ -2554,6 +2557,7 @@ function renderTrimTable(){
         <td id="t-st-${i}"><span class="badge ${bg.c}">${bg.t}</span></td>
       </tr>`;
   });
+  applyFilterVisibility();   // idem: só os representantes do filtro/região
 }
 
 // ── HELPERS DE RENDER (reutilizados pelo filtro e pelo recalc) ──
