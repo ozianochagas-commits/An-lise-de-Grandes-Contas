@@ -365,17 +365,14 @@
   .ibox h4{font-size:12px;font-weight:700;margin-bottom:6px;}
   .ibox li{font-size:11px;color:#555;margin-bottom:4px;padding-left:14px;
     list-style:none;position:relative;}
+  .entrega-box{margin-bottom:22px;}
+  .entrega-box h4{font-size:12px;font-weight:800;margin-bottom:8px;color:#333;}
   .entrega-box h4 span{font-weight:500;color:#888;font-size:10px;margin-left:6px;}
-  .entrega-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:8px;}
-  .entrega-card{background:#FAFAFA;border:1px solid #eee;border-radius:8px;padding:9px 12px;}
-  .entrega-card.total{background:#1C1C1C;color:#fff;border-color:#1C1C1C;}
-  .entrega-card .en-nome{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .entrega-card .en-pct{font-size:22px;font-weight:900;line-height:1.2;margin:2px 0 4px;}
-  .entrega-card .en-bar{height:5px;background:#e5e5e5;border-radius:3px;overflow:hidden;}
-  .entrega-card.total .en-bar{background:#444;}
-  .entrega-card .en-bar div{height:100%;border-radius:3px;}
-  .entrega-card .en-det{font-size:9px;color:#888;margin-top:5px;}
-  .entrega-card.total .en-det{color:#bbb;}
+  .entrega-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;}
+  .entrega-grid .pcard{min-width:0;}
+  .entrega-grid .pcl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .entrega-grid .en-bar{height:4px;background:rgba(255,255,255,.2);border-radius:2px;overflow:hidden;margin:4px 0 6px;}
+  .entrega-grid .en-bar div{height:100%;border-radius:2px;}
   .ibox li::before{content:'›';position:absolute;left:0;color:var(--orange);font-weight:900;}
   .ibox li strong{color:var(--orange);}
 
@@ -1317,7 +1314,7 @@
     <div class="pcard d"><div class="pcl">% Projetado</div><div class="pcv" id="pv-prj">—</div><div class="pcs">Projeção ÷ Meta</div></div>
   </div>
   <!-- % de Entrega: do que foi vendido (Realizado + Carteira), quanto já foi faturado -->
-  <div class="ibox entrega-box">
+  <div class="entrega-box">
     <h4>🚚 % de Entrega <span>Faturado ÷ (Faturado + Carteira) — quanto do que foi vendido já foi entregue</span></h4>
     <div class="entrega-grid" id="entrega-grid"></div>
   </div>
@@ -2470,17 +2467,18 @@ function loadClientsData(){
 // fábrica), quanto já foi entregue/faturado. Card escuro = total da RIO.
 function buildEntrega(lista){
   const grid = $('entrega-grid'); if(!grid) return;
-  const cor = p => p >= 0.9 ? '#1E7E34' : (p >= 0.75 ? '#D68910' : '#C0392B');
+  // Cor do número (tons claros, sobre o fundo escuro/laranja dos quadrinhos)
+  const cor = p => p >= 0.9 ? '#5DD879' : (p >= 0.75 ? '#F5C542' : '#FF8A7A');
   const card = (nome, real, car, total) => {
     const vendido = real + car;
     // arredonda como aparece na tela (ex.: 89,99% → 90,0% já conta como verde)
     const pct = vendido > 0 ? Math.round(real / vendido * 1000) / 1000 : 0;
-    const c = total ? (pct >= 0.9 ? '#5DD879' : (pct >= 0.75 ? '#F5B041' : '#FF7B6B')) : cor(pct);
-    return `<div class="entrega-card${total ? ' total' : ''}" title="${nome}: faturado ${R(real)} de ${R(vendido)} vendidos">
-      <div class="en-nome">${nome}</div>
-      <div class="en-pct" style="color:${c}">${vendido > 0 ? P(pct) : '—'}</div>
-      <div class="en-bar"><div style="width:${Math.min(pct*100,100)}%;background:${c}"></div></div>
-      <div class="en-det">Faturado ${R(real)} · Carteira ${R(car)}</div>
+    const c = total ? '#fff' : cor(pct);
+    return `<div class="pcard ${total ? 'd' : 'a'}" title="${nome}: faturado ${R(real)} de ${R(vendido)} vendidos">
+      <div class="pcl">${total ? 'Entrega Total RIO' : nome}</div>
+      <div class="pcv" style="color:${c}">${vendido > 0 ? P(pct) : '—'}</div>
+      <div class="en-bar"><div style="width:${Math.min(pct*100,100)}%;background:${total ? '#fff' : c}"></div></div>
+      <div class="pcs">Faturado ${R(real)}<br>Carteira ${R(car)}</div>
     </div>`;
   };
   let tR = 0, tC = 0;
