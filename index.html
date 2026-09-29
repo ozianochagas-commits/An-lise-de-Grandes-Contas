@@ -37,6 +37,13 @@
   #usuario-select option{background:#fff;color:#222;font-weight:700;}
   #usuario-regiao{font-size:10px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,.65);text-transform:uppercase;}
   @media(max-width:600px){ .usuario-box{margin-left:0;width:100%;} #usuario-select{flex:1;} }
+  #usuarios-online{display:flex;align-items:center;}
+  #usuarios-online .uo-av{position:relative;width:32px;height:32px;border-radius:50%;margin-left:-6px;border:2px solid var(--dark);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:13px;cursor:default;}
+  #usuarios-online .uo-av:first-child{margin-left:0;}
+  #usuarios-online .uo-av::after{content:'';position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;
+    background:#2ECC40;border:2px solid var(--dark);}
+  #usuarios-online .uo-av.eu{outline:2px solid var(--orange);outline-offset:1px;}
   #btn-config{background:transparent;border:2px solid rgba(255,255,255,.35);border-radius:8px;width:40px;height:40px;
     display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;flex-shrink:0;transition:all .2s;}
   #btn-config:hover{border-color:var(--orange);color:var(--orange);transform:rotate(45deg);}
@@ -999,6 +1006,7 @@
       <option value="Gustavo">Gustavo</option>
     </select>
     <span id="usuario-regiao"></span>
+    <div id="usuarios-online" title="Quem está online agora"></div>
     <button id="btn-config" type="button" onclick="abrirConfig()" title="Configurações: o que cada usuário pode ver">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
@@ -3074,6 +3082,8 @@ function trocarUsuarioSistema(u){
   // Agenda e Cliente 360 (mesmo domínio): atualiza na hora se já estiverem abertos
   try{ const a = $('agenda-frame'); if(a && a.contentWindow && typeof a.contentWindow.escolherUsuario === 'function') a.contentWindow.escolherUsuario(u); }catch(e){}
   try{ const c = $('cliente360-frame'); if(c && c.contentWindow && typeof c.contentWindow.atualizarSelectGrupos === 'function') c.contentWindow.atualizarSelectGrupos(); }catch(e){}
+  anunciarPresenca();
+  renderUsuariosOnline();
   showNotification(`👤 ${u} — ${regiaoAtual().nome}`);
 }
 function abrirModalUsuario(){
@@ -3081,6 +3091,46 @@ function abrirModalUsuario(){
   g.innerHTML = USUARIOS_SISTEMA.map(u =>
     `<button onclick="trocarUsuarioSistema('${u}')">${u}<small>${REGIOES[REGIAO_DO_USUARIO[u]].nome.toUpperCase()}</small></button>`).join('');
   $('modal-usuario').classList.add('on');
+}
+
+// ── QUEM ESTÁ ONLINE (carinhas ao lado da engrenagem) ─────────
+// Usa a "presença" em tempo real do Supabase: cada aba aberta anuncia o
+// usuário escolhido e todo mundo vê as bolinhas de quem está usando agora.
+// Não grava nada no banco — some sozinho quando a pessoa fecha o site.
+const CORES_USUARIO = {Oziano:'#FE5000', Samuel:'#2980B9', Beto:'#8E44AD', Pamela:'#D81B60', Gustavo:'#16A085'};
+let __canalPresenca = null;
+function idDesteAparelho(){
+  try{
+    let id = sessionStorage.getItem('presenca_id');
+    if(!id){ id = Math.random().toString(36).slice(2) + Date.now().toString(36); sessionStorage.setItem('presenca_id', id); }
+    return id;
+  }catch(e){ return Math.random().toString(36).slice(2); }
+}
+function renderUsuariosOnline(){
+  const box = $('usuarios-online'); if(!box || !__canalPresenca) return;
+  const online = new Set();
+  Object.values(__canalPresenca.presenceState()).forEach(lista =>
+    (lista || []).forEach(p => { if(USUARIOS_SISTEMA.includes(p.usuario)) online.add(p.usuario); }));
+  const eu = usuarioSistema();
+  box.innerHTML = USUARIOS_SISTEMA.filter(u => online.has(u)).map(u =>
+    `<div class="uo-av${u === eu ? ' eu' : ''}" style="background:${CORES_USUARIO[u] || '#555'}" title="${u} — online agora${u === eu ? ' (você)' : ''}">${u[0]}</div>`).join('');
+  // No seletor de usuário, marca quem está online
+  const sel = $('usuario-select');
+  if(sel) Array.from(sel.options).forEach(o => { o.textContent = (online.has(o.value) ? '🟢 ' : '') + o.value; });
+}
+function anunciarPresenca(){
+  const u = usuarioSistema();
+  if(__canalPresenca && u) __canalPresenca.track({ usuario: u, desde: new Date().toISOString() }).catch(() => {});
+}
+function iniciarPresenca(){
+  try{
+    initSupabase();
+    if(!window.supabaseClient || __canalPresenca) return;
+    __canalPresenca = window.supabaseClient.channel('usuarios-online', { config: { presence: { key: idDesteAparelho() } } });
+    __canalPresenca
+      .on('presence', { event: 'sync' }, renderUsuariosOnline)
+      .subscribe(status => { if(status === 'SUBSCRIBED') anunciarPresenca(); });
+  }catch(e){ console.warn('⚠️ Não foi possível mostrar quem está online.', e); }
 }
 
 // ── CONFIGURAÇÕES (engrenagem ⚙️) ─────────────────────────────
@@ -7197,6 +7247,7 @@ async function initDashboard() {
   if(!shared) await carregarConfigRegioes();   // o que cada usuário pode ver (engrenagem ⚙️)
   aplicarRegiaoNosFiltros();
   if(!shared && !usuarioSistema()) abrirModalUsuario();
+  if(!shared) iniciarPresenca();   // carinhas de quem está online
   // Abre SEMPRE no trimestre vigente (a edição salva nesse trimestre)
   if(!shared){ currentTrimestre = getVigenteTrimestre(); }
   aplicarTrimestreUI(currentTrimestre);
