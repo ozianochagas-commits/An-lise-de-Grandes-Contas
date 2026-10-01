@@ -1656,6 +1656,18 @@
           <div style="font-size:24px;font-weight:900;color:var(--dark);" id="plano-total-pct">0%</div>
         </div>
 
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <div style="flex:1;background:#f9f9f9;border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Total de Planos</div>
+            <div style="font-size:22px;font-weight:900;color:var(--dark);" id="plano-qtd-planos">0</div>
+          </div>
+          <div style="flex:1;background:#EEF8F0;border-radius:8px;padding:10px 12px;border-left:3px solid #1E7E34;">
+            <div style="font-size:9px;color:#1E7E34;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Planos Batidos</div>
+            <div style="font-size:22px;font-weight:900;color:#1E7E34;" id="plano-qtd-batidos">0</div>
+            <div style="font-size:10px;color:#555;font-weight:600;" id="plano-qtd-batidos-pct"></div>
+          </div>
+        </div>
+
         <div id="plano-outras-regioes-box" style="background:#fff8f0;border-radius:8px;padding:12px;margin-bottom:14px;border-left:3px solid #999;display:none;">
           <div style="font-size:9px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Valor fora da carteira, por UF</div>
           <div id="plano-outras-regioes-lista" style="font-size:12px;color:var(--dark);"></div>
@@ -6664,6 +6676,15 @@ function renderPlanoTable(dados){
   const valorExcluidoPorUf = {}; // UF -> soma do valor das filiais marcadas "fora da carteira"
   let periodoIndex = 0;
   let grupoIndex = 0;
+  // Contagem de planos: cada grupo com objetivo = 1 plano; nos grupos de
+  // clientes avulsos ("CLIENTE TRIMESTRAIS/SEMESTRAIS", cód. 0000) cada
+  // cliente com objetivo conta como um plano. Batido = faturado ≥ objetivo.
+  let qtdPlanos = 0, qtdBatidos = 0;
+  const contaPlano = (total, objetivo) => {
+    if (!(Number(objetivo) > 0)) return;
+    qtdPlanos++;
+    if ((Number(total) || 0) >= Number(objetivo)) qtdBatidos++;
+  };
 
   // ═══════════════════════════════════════════════════════════════════════════════
   // ESTRATÉGIA: Agrupar por PERÍODO primeiro (TRIMESTRAL, SEMESTRAL)
@@ -6769,6 +6790,8 @@ function renderPlanoTable(dados){
       totalObjetivo += objetivoAjustado;
       totalFaturado += totalAjustado;
       totalFalta += faltaAjustada;
+      if (String(grupo.codCli) === '0000') (grupo.clientes || []).forEach(c => contaPlano(c.total, c.objetivo));
+      else contaPlano(totalAjustado, objetivoAjustado);
 
       // Linha do AGRUPADOR
       // A tabela inteira é reconstruída (tbody.innerHTML='') sempre que algo
@@ -6904,6 +6927,10 @@ function renderPlanoTable(dados){
   if (oldTotalObjetivoEl) oldTotalObjetivoEl.textContent = formatMoney(totalObjetivo);
   if (oldTotalFaltaEl) oldTotalFaltaEl.textContent = formatMoney(totalFalta);
   if (oldTotalPctEl) oldTotalPctEl.textContent = resultadoPctTotalStr + '%';
+  const qtdPlanosEl = $('plano-qtd-planos'), qtdBatidosEl = $('plano-qtd-batidos'), qtdBatidosPctEl = $('plano-qtd-batidos-pct');
+  if (qtdPlanosEl) qtdPlanosEl.textContent = String(qtdPlanos);
+  if (qtdBatidosEl) qtdBatidosEl.textContent = String(qtdBatidos);
+  if (qtdBatidosPctEl) qtdBatidosPctEl.textContent = qtdPlanos ? `${qtdBatidos} de ${qtdPlanos} · ${Math.round(qtdBatidos / qtdPlanos * 100)}%` : '';
 
   // "Valor fora da carteira, por UF" — soma das filiais marcadas, agrupada
   // por estado, para mostrar pra onde esse valor deveria ir (outro rep/região).
