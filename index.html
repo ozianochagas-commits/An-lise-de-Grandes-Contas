@@ -1595,13 +1595,15 @@
       <div>
         <div id="plano-import-controls" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap;">
           <div style="flex:1;min-width:220px;">
-            <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">🔍 Filtro de Trimestre:</label>
+            <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">🔍 Filtro de Período:</label>
             <select id="plano-trimestre-filter" onchange="applyPlanoFilter()" style="width:100%;margin-top:6px;padding:8px 12px;border:2px solid #E0E0E0;border-radius:7px;font-size:11px;font-weight:600;outline:none;cursor:pointer;">
-              <option value="">Todos os trimestres</option>
+              <option value="">Todos os períodos (trimestral e semestral)</option>
               <option value="1">1º Trimestre</option>
               <option value="2">2º Trimestre</option>
               <option value="3">3º Trimestre</option>
               <option value="4">4º Trimestre</option>
+              <option value="S1">1º Semestre</option>
+              <option value="S2">2º Semestre</option>
             </select>
           </div>
           <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
@@ -6595,6 +6597,14 @@ function onPlanoRepChange(){
   applyPlanoFilter();
 }
 
+// Filtro de período do Plano: '' = todos; '1'..'4' = trimestre; 'S1'/'S2' = semestre
+function planoNoPeriodoFiltro(plano, filtro){
+  if (!filtro) return true;
+  const periodo = String(plano.periodo || '').toUpperCase();
+  if (/^S\d$/.test(filtro)) return periodo === 'SEMESTRAL' && String(plano.periodoNum || '') === filtro.slice(1);
+  return periodo !== 'SEMESTRAL' && String(plano.trimestre || plano.periodoNum || '') === filtro;
+}
+
 function applyPlanoFilter(){
   const repSelect = $('plano-rep-select');
   // Só representantes da região do usuário
@@ -6612,7 +6622,7 @@ function applyPlanoFilter(){
     // Mostrar tudo (da região)
     Object.keys(PLANO_BY_REP).filter(repNaRegiao).forEach(rep => {
       PLANO_BY_REP[rep].forEach(plano => {
-        if (!selectedTrimestre || plano.trimestre === selectedTrimestre) {
+        if (planoNoPeriodoFiltro(plano, selectedTrimestre)) {
           filteredData.push({
             representante: rep,
             ...plano
@@ -6624,7 +6634,7 @@ function applyPlanoFilter(){
     // Mostrar só o representante selecionado
     if (PLANO_BY_REP[selectedRep]) {
       PLANO_BY_REP[selectedRep].forEach(plano => {
-        if (!selectedTrimestre || plano.trimestre === selectedTrimestre) {
+        if (planoNoPeriodoFiltro(plano, selectedTrimestre)) {
           filteredData.push({
             representante: selectedRep,
             ...plano
@@ -6722,7 +6732,20 @@ function renderPlanoTable(dados){
 
     const periodResultado = periodTotalObjetivo > 0 ? (periodTotalFaturado / periodTotalObjetivo) : 0;
 
-    // NÃO renderizar header de período - vai direto para os grupos!
+    // Com trimestrais E semestrais na tela, cada período ganha um título e um
+    // subtotal próprios (não dá para misturar meta de 3 meses com a de 6).
+    const variosPeriodos = periodos.length > 1;
+    const ehSemestral = periodoKey === 'SEMESTRAL';
+    const numsPeriodo = Array.from(new Set(dados
+      .filter(pl => String(pl.periodo || 'TRIMESTRAL').toUpperCase() === periodoKey)
+      .map(pl => String(pl.periodoNum || pl.trimestre || '')).filter(Boolean))).sort();
+    const nomePeriodo = numsPeriodo.map(n => `${n}º ${ehSemestral ? 'Semestre' : 'Trimestre'}`).join(', ');
+    if (variosPeriodos) {
+      const cab = document.createElement('tr');
+      cab.innerHTML = `<td colspan="7" style="background:${ehSemestral ? '#4A3B6B' : 'var(--dark)'};color:#fff;font-weight:900;font-size:12px;letter-spacing:.4px;text-align:left;padding:10px 14px;">
+        ${ehSemestral ? '📆 CLIENTES SEMESTRAIS' : '📅 CLIENTES TRIMESTRAIS'}${nomePeriodo ? ` <span style="font-weight:700;opacity:.8;margin-left:6px;">— ${nomePeriodo}</span>` : ''}</td>`;
+      tbody.appendChild(cab);
+    }
 
     // Renderizar agrupadores dentro do período
     grupos.forEach(grupo => {
@@ -6826,6 +6849,19 @@ function renderPlanoTable(dados){
         tbody.appendChild(cliRow);
       });
     });
+
+    if (variosPeriodos) {
+      const sub = document.createElement('tr');
+      sub.style.cssText = `background:${ehSemestral ? '#EDE7F6' : '#FFE9DC'};font-weight:800;font-size:11px;`;
+      sub.innerHTML = `
+        <td></td><td></td>
+        <td style="text-align:left;">SUBTOTAL ${ehSemestral ? 'SEMESTRAL' : 'TRIMESTRAL'}${nomePeriodo ? ` (${nomePeriodo})` : ''}</td>
+        <td style="text-align:right;">${formatMoney(periodTotalFaturado)}</td>
+        <td style="text-align:right;">${formatMoney(periodTotalObjetivo)}</td>
+        <td style="text-align:right;">${formatMoney(periodTotalObjetivo - periodTotalFaturado)}</td>
+        <td style="text-align:right;">${(periodResultado * 100).toFixed(1)}%</td>`;
+      tbody.appendChild(sub);
+    }
   });
 
   // Adicionar linha de TOTAL
