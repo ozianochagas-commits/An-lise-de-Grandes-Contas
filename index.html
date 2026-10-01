@@ -3493,6 +3493,20 @@ function toggleFilterMenu(){
   }
 }
 
+// Clique DENTRO de uma aba embutida (Gestão de Transporte, Agenda, Cliente 360)
+// não chega a este documento: o navegador só avisa que a janela perdeu o foco
+// para o quadro (iframe). Nesse caso também fecha a lista de representantes.
+window.addEventListener('blur', function(){
+  setTimeout(function(){
+    const ativo = document.activeElement;
+    if(ativo && ativo.tagName === 'IFRAME'){
+      const menu = $('filter-menu'), btn = $('filter-btn');
+      if(menu) menu.style.display = 'none';
+      if(btn) btn.classList.remove('active');
+    }
+  }, 0);
+});
+
 // Fechar dropdown ao clicar fora
 document.addEventListener('click', function(event){
   const dropdown = document.querySelector('.filter-dropdown');
