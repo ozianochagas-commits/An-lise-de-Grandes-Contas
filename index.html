@@ -4668,7 +4668,7 @@ function applyInativFilter(){
   }
 
   const semVendaCount = contarNaoComprouGlobalSemFiltros(mesIdx);
-  sv('inativ-total', Math.max(0, semVendaCount - 1).toString());
+  sv('inativ-total', semVendaCount.toString());   // mesma conta do número ao lado do mês
   sv('inativ-kpi-mes', 'em ' + (INATIV_DATA.months[mesIdx] || ''));
 
   if(filtered.length === 0){
