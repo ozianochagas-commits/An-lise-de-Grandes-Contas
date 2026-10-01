@@ -2488,7 +2488,7 @@ function loadClientsData(){
 // ── % DE ENTREGA ─────────────────────────────────────────────
 // Do que o representante vendeu (faturado + o que ficou em carteira na
 // fábrica), quanto já foi entregue/faturado. Card escuro = total da RIO.
-function buildEntrega(lista, totais){
+function buildEntrega(lista){
   const grid = $('entrega-grid'); if(!grid) return;
   // Cor do número (tons claros, sobre o fundo escuro/laranja dos quadrinhos)
   const cor = p => p >= 0.9 ? '#4E9F6A' : (p >= 0.75 ? '#C99A3A' : '#C96B5E');
@@ -2498,7 +2498,7 @@ function buildEntrega(lista, totais){
     const pct = vendido > 0 ? Math.round(real / vendido * 1000) / 1000 : 0;
     const c = total ? '#E0864F' : cor(pct);
     return `<div class="en-card${total ? ' total' : ''}" title="${nome}: faturado ${R(real)} de ${R(vendido)} vendidos">
-      <div class="pcl">${total ? 'Entrega ' + nome : nome}</div>
+      <div class="pcl">${total ? 'Entrega Total RIO' : nome}</div>
       <div class="pcv" style="color:${c}">${vendido > 0 ? P(pct) : '—'}</div>
       <div class="en-bar"><div style="width:${Math.min(pct*100,100)}%;background:${c};opacity:.75"></div></div>
       <div class="pcs">Faturado ${R(real)}<br>Carteira ${R(car)}</div>
@@ -2506,42 +2506,12 @@ function buildEntrega(lista, totais){
   };
   let tR = 0, tC = 0;
   lista.forEach(r => { tR += r.real; tC += r.car; });
-  // Totais no fim (lado direito): a região do usuário e o geral da RIO, para
-  // comparar o representante escolhido com a região e com o todo.
-  const extras = [];
-  if(totais && totais.length){
-    // vários representantes marcados, mas não a região inteira: mostra também a soma deles
-    const regiao = totais.find(t => t.regiao);
-    if(lista.length > 1 && (!regiao || lista.length < regiao.qtd)) extras.push({nome:'Total Selecionados', real:tR, car:tC});
-    totais.forEach(t => extras.push(t));
-  } else if(lista.length > 1){
-    extras.push({nome:'Total RIO', real:tR, car:tC});
-  }
-  // as colunas se dividem igualmente para ocupar a largura toda,
-  // alinhadas com os quadrinhos de cima (até 6 por linha)
-  const qtd = lista.length + extras.length;
+  // Total da RIO no fim (lado direito); as colunas se dividem igualmente para
+  // ocupar a largura toda, alinhadas com os quadrinhos de cima (até 6 por linha)
+  const qtd = lista.length + (lista.length > 1 ? 1 : 0);
   grid.style.gridTemplateColumns = `repeat(${Math.max(1, Math.min(qtd, 6))}, minmax(0, 1fr))`;
   grid.innerHTML = lista.map(r => card(r.name, r.real, r.car, false)).join('') +
-    extras.map(t => card(t.nome, t.real, t.car, true)).join('');
-}
-
-// Totais para os cards de entrega: região do usuário (se não for o Brasil
-// todo) e o geral da RIO (todos os representantes).
-function totaisEntrega(vals){
-  try{ return totaisEntregaCalc(vals); }catch(e){ return null; }   // região ainda não carregada
-}
-function totaisEntregaCalc(vals){
-  if(__regiaoDesligada) return null;   // link compartilhado: só o que o link mostra
-  const soma = idxs => idxs.reduce((a, i) => { a.real += vals[i].real; a.car += vals[i].car; return a; }, {real:0, car:0});
-  const todos = vals.map((_, i) => i);
-  const daRegiao = Array.from(document.querySelectorAll('.rep-checkbox')).map(cb => parseInt(cb.dataset.idx));
-  const out = [];
-  const r = regiaoAtual();
-  if(r.reps && daRegiao.length && daRegiao.length < todos.length){
-    out.push(Object.assign({nome:'Total ' + r.nome, regiao:true, qtd:daRegiao.length}, soma(daRegiao)));
-  }
-  out.push(Object.assign({nome:'Total RIO', regiao:!(r.reps && daRegiao.length < todos.length), qtd:todos.length}, soma(todos)));
-  return out;
+    (lista.length > 1 ? card('Total RIO', tR, tC, true) : '');
 }
 
 // ── RECALC MONTHLY ──────────────────────────────────────────────
@@ -2596,7 +2566,7 @@ function recalc(){
 
   // 5. Tabela do Dashboard
   buildDashTable(disp);
-  buildEntrega(selectedIndices.map(i => ({ name: vals[i].name, real: vals[i].real, car: vals[i].car })), totaisEntrega(vals));
+  buildEntrega(selectedIndices.map(i => ({ name: vals[i].name, real: vals[i].real, car: vals[i].car })));
   buildCenarioDetalhe(disp);
 
   // 6. Rodapé do Dashboard
