@@ -1669,7 +1669,7 @@
         </div>
 
         <div id="plano-outras-regioes-box" style="background:#fff8f0;border-radius:8px;padding:12px;margin-bottom:14px;border-left:3px solid #999;display:none;">
-          <div style="font-size:9px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Valor fora da carteira, por UF</div>
+          <div style="font-size:9px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Venda em Estado de outro representante</div>
           <div id="plano-outras-regioes-lista" style="font-size:12px;color:var(--dark);"></div>
         </div>
 
@@ -6609,6 +6609,46 @@ function onPlanoRepChange(){
   applyPlanoFilter();
 }
 
+// ══════════ VENDA QUE PASSA PARA OUTRO REPRESENTANTE (por Estado) ══════════
+// Dono de cada Estado pela região do representante (Norte/Nordeste). Uma filial
+// do plano de um representante que fica em Estado de OUTRO tem a venda
+// passada para esse outro (ex.: grupo da ATIVA com filial em PE → IG).
+const DONO_UF_PLANO = {
+  CE:'ATIVA', PI:'ATIVA', MA:'ATIVA',
+  PE:'IG', PB:'IG', RN:'IG', AL:'IG', SE:'IG',
+  AM:'PEREIRA', AP:'PEREIRA', PA:'PEREIRA',
+  AC:'RBR', BA:'RBR', RO:'RBR', RR:'RBR', TO:'RBR'
+};
+const NOME_DONO_PLANO = { ATIVA:'ATIVA', IG:'IG', PEREIRA:'PEREIRA MEDINA', RBR:'RBR' };
+function donoUfPlano(uf){ return DONO_UF_PLANO[String(uf || '').toUpperCase().trim()] || null; }
+// Meses do período do plano (abreviações iguais às da análise de Clientes Inativos)
+function mesesDoPeriodoPlano(periodo, num){
+  const n = parseInt(num, 10); if (!n) return [];
+  const ab = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  return String(periodo || '').toUpperCase() === 'SEMESTRAL' ? ab.slice((n-1)*6, n*6) : ab.slice((n-1)*3, n*3);
+}
+// Venda de uma filial (pelo código) nos meses indicados, tirada da análise de
+// Clientes Inativos (que tem a venda mês a mês de cada filial).
+function vendaFilialInativos(cod, mesesAb){
+  cod = String(cod ?? '').trim();
+  const out = { achou:false, valor:0, meses:[] };
+  if (!cod || !mesesAb.length) return out;
+  for (const d of Object.values(INATIV_BY_REP || {})) {
+    const idxs = (d.months || []).map((m, i) => ({ m, i }))
+      .filter(x => mesesAb.some(a => String(x.m || '').toLowerCase().startsWith(a.toLowerCase())));
+    for (const g of (d.grupos || [])) {
+      for (const f of (g.filiais || [])) {
+        const m = String(f.nome || '').match(/\((\d+)\)\s*$/);
+        if (!m || m[1] !== cod) continue;
+        out.achou = true;
+        idxs.forEach(x => { out.valor += Number(f.vals && f.vals[x.i]) || 0; if (!out.meses.includes(x.m)) out.meses.push(x.m); });
+        return out;   // a filial aparece uma vez só (já reagrupada por representante)
+      }
+    }
+  }
+  return out;
+}
+
 // Filtro de período do Plano: '' = todos; '1'..'4' = trimestre; 'S1'/'S2' = semestre
 function planoNoPeriodoFiltro(plano, filtro){
   if (!filtro) return true;
@@ -6780,7 +6820,8 @@ function renderPlanoTable(dados){
       const filiaisExcluidas = (grupo.clientes || []).filter(c => isFilialExcluida(c.codCli));
       filiaisExcluidas.forEach(c => {
         const uf = String(c.uf || '??').trim().toUpperCase() || '??';
-        valorExcluidoPorUf[uf] = (valorExcluidoPorUf[uf] || 0) + (Number(c.total) || 0);
+        const vInat = Number(c.total) ? null : vendaFilialInativos(c.codCli, mesesDoPeriodoPlano(periodoKey, numsPeriodo[0]));
+        valorExcluidoPorUf[uf] = (valorExcluidoPorUf[uf] || 0) + (Number(c.total) || (vInat ? vInat.valor : 0));
       });
       const totalAjustado = Number(grupo.total) || 0;
       const objetivoAjustado = Number(grupo.objetivo) || 0;
@@ -6944,22 +6985,68 @@ function renderPlanoTable(dados){
   const repSelecionado = repSelectAtual ? repSelectAtual.value : '';
 
   if (outrasRegioesBox && outrasRegioesLista) {
-    if (repSelecionado && ufsComValor.length) {
-      const totalExcluidoGeral = ufsComValor.reduce((soma, uf) => soma + valorExcluidoPorUf[uf], 0);
-      // Puramente informativo — não subtrai nada. Total/Objetivo/Falta/
-      // Resultado% (tabela principal) ficam sempre com o valor cheio,
-      // direto da planilha importada.
-      outrasRegioesLista.innerHTML = ufsComValor.map(uf => `
-        <div style="display:flex;justify-content:space-between;padding:3px 0;">
-          <span style="display:inline-block;background:#7CB342;color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">${uf}</span>
-          <span style="font-weight:700;">${formatMoney(valorExcluidoPorUf[uf])}</span>
-        </div>
-      `).join('') + `
-        <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid #e0d5c5;">
+    // 1) AUTOMÁTICO: filiais do plano em Estado de outro representante
+    const passadas = {};   // destino -> { uf -> { valor, filiais } }
+    let filiaisSemVendaInfo = 0, mesesUsados = [];
+    if (repSelecionado) {
+      const dono = repBrandKey(repSelecionado) === 'PEREIRA' ? 'PEREIRA' : repBrandKey(repSelecionado);
+      dados.forEach(pl => {
+        const mesesAb = mesesDoPeriodoPlano(pl.periodo, pl.periodoNum || pl.trimestre);
+        (pl.grupos || []).forEach(g => {
+          const lista = (g.clientes && g.clientes.length) ? g.clientes : [{ codCli: g.codCli, uf: g.uf, cliente: g.nome }];
+          lista.forEach(c => {
+            const destino = donoUfPlano(c.uf);
+            if (!destino || destino === dono) return;
+            const uf = String(c.uf).toUpperCase().trim();
+            const v = vendaFilialInativos(c.codCli, mesesAb);
+            if (!v.achou) filiaisSemVendaInfo++;
+            v.meses.forEach(m => { if (!mesesUsados.includes(m)) mesesUsados.push(m); });
+            const d = (passadas[destino] = passadas[destino] || {});
+            const u = (d[uf] = d[uf] || { valor: 0, filiais: 0 });
+            u.valor += v.valor; u.filiais++;
+          });
+        });
+      });
+    }
+    const destinos = Object.keys(passadas).sort();
+    const chip = (uf, cor) => `<span style="display:inline-block;background:${cor};color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">${uf}</span>`;
+    let html = '';
+    let totalPassado = 0;
+    if (destinos.length) {
+      destinos.forEach(dest => {
+        const ufs = Object.keys(passadas[dest]).sort();
+        const totDest = ufs.reduce((a, uf) => a + passadas[dest][uf].valor, 0);
+        totalPassado += totDest;
+        html += `<div style="margin:6px 0 2px;display:flex;justify-content:space-between;font-weight:900;color:var(--dark);">
+          <span>→ ${NOME_DONO_PLANO[dest] || dest}</span><span>${formatMoney(totDest)}</span></div>`;
+        html += ufs.map(uf => `<div style="display:flex;justify-content:space-between;padding:2px 0 2px 12px;">
+            <span>${chip(uf, '#7CB342')} <span style="font-size:9px;color:#888;">${passadas[dest][uf].filiais} filia${passadas[dest][uf].filiais > 1 ? 'is' : 'l'}</span></span>
+            <span style="font-weight:700;">${formatMoney(passadas[dest][uf].valor)}</span></div>`).join('');
+      });
+      html += `<div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid #e0d5c5;">
+          <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:#666;">Total passado</span>
+          <span style="font-weight:900;color:var(--dark);">${formatMoney(totalPassado)}</span></div>`;
+      const semInativ = !Object.keys(INATIV_BY_REP || {}).length;
+      html += `<div style="font-size:9px;color:#888;margin-top:6px;line-height:1.4;">${semInativ
+        ? '⚠️ Importe a análise de Clientes Inativos para ver os valores (a planilha do plano não traz a venda de cada filial).'
+        : `Venda de cada filial pela análise de Clientes Inativos${mesesUsados.length ? ' (' + mesesUsados.join(', ') + ')' : ''}.${filiaisSemVendaInfo ? ` ${filiaisSemVendaInfo} filial(is) não encontrada(s) lá.` : ''}`}</div>`;
+    }
+
+    // 2) MANUAL: filiais marcadas "fora da carteira" (só UFs com valor)
+    const ufsManuais = ufsComValor.filter(uf => valorExcluidoPorUf[uf] > 0);
+    if (repSelecionado && ufsManuais.length) {
+      const totalExcluidoGeral = ufsManuais.reduce((soma, uf) => soma + valorExcluidoPorUf[uf], 0);
+      html += `<div style="font-size:9px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin:${html ? '14px' : '0'} 0 6px;">Marcadas "fora da carteira"</div>`;
+      html += ufsManuais.map(uf => `<div style="display:flex;justify-content:space-between;padding:3px 0;">
+          ${chip(uf, '#999')}<span style="font-weight:700;">${formatMoney(valorExcluidoPorUf[uf])}</span></div>`).join('');
+      html += `<div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid #e0d5c5;">
           <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:#666;">Total</span>
-          <span style="font-weight:900;color:var(--dark);">${formatMoney(totalExcluidoGeral)}</span>
-        </div>
-      `;
+          <span style="font-weight:900;color:var(--dark);">${formatMoney(totalExcluidoGeral)}</span></div>`;
+    }
+
+    // Puramente informativo — não subtrai nada de Total/Objetivo/Falta/Resultado%.
+    if (repSelecionado && html) {
+      outrasRegioesLista.innerHTML = html;
       outrasRegioesBox.style.display = 'block';
     } else {
       outrasRegioesLista.innerHTML = '';
