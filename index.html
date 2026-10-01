@@ -3814,13 +3814,13 @@ function contarNaoComprouGlobalSemFiltros(mesIdx){
   let count = 0;
   if(!INATIV_DATA || !INATIV_DATA.grupos) return 0;
 
-  // Conta GRUPOS sem venda no mês: o grupo não comprou ("NÃO") ou alguma filial
-  // dele não comprou ("⚠ filial s/ venda") — exatamente as linhas que aparecem
-  // no filtro "✗ Não comprou" da coluna do mês.
+  // Grupo que não comprou ("NÃO") conta 1; grupo que comprou mas tem filiais
+  // sem venda ("⚠ 3 filiais s/ venda") conta cada uma dessas filiais.
   INATIV_DATA.grupos.forEach(grupo => {
     // Pular grupos excluídos da análise
     if(grupoExcluido(grupo.nome)) return;
-    if(gGrupoTemSemVenda(grupo, mesIdx)) count++;
+    if(grupo.vals && grupo.vals[mesIdx] === 0) count++;
+    else count += nFiliaisSemVenda(grupo, mesIdx);
   });
   return count;
 }
