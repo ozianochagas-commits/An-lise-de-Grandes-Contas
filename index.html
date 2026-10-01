@@ -4483,6 +4483,7 @@ function repOverrideForGroup(cliAgrup){
   if(n.indexOf('BEZERRA & OLIVEIRA') >= 0) return 'ATIVA';                       // BEZERRA & OLIVEIRA → ATIVA
   if(n.indexOf('AUTO PECAS PADRE CICERO') >= 0) return 'ATIVA';                  // AUTO PEÇAS PADRE CÍCERO → ATIVA
   if(n.indexOf('AUTOFORT NORDESTE') >= 0) return 'ATIVA';                        // AUTOFORT NORDESTE → ATIVA
+  if(n.indexOf('ROXO AUTO PECAS') >= 0 || n.indexOf('(8381)') >= 0) return 'ATIVA'; // ROXO (agrupador 8381, filial 9401) → ATIVA
   if(n.indexOf('AUTO NORTE DISTRIBUIDORA') >= 0) return 'IG REPRESENTACOES COMERCIAIS'; // AUTO NORTE → IG REPRESENTAÇÕES
   return null;
 }
@@ -4712,7 +4713,12 @@ function applyInativFilter(){
     const multiFilial = g.filiais.length > 1;
     // grupo é clicável se tem 2+ filiais OU 1 filial com famílias
     const filialUnica = g.filiais.length === 1 ? g.filiais[0] : null;
-    const clicavel = multiFilial || (filialUnica && filialUnica.familias.length > 0);
+    // 1 filial com código diferente do agrupador (ex.: grupo 8381 → filial 9401):
+    // mostra a filial antes das famílias, como na planilha
+    const codigoDe = nome => { const m = String(nome || '').match(/\((\d+)\)\s*$/); return m ? m[1] : null; };
+    const filialDiferente = !!filialUnica && codigoDe(filialUnica.nome) !== codigoDe(g.nome);
+    const mostraFiliais = multiFilial || filialDiferente;
+    const clicavel = mostraFiliais || (filialUnica && filialUnica.familias.length > 0);
 
     // ── LINHA DO GRUPO (nível 1) ──
     html += `
@@ -4728,7 +4734,7 @@ function applyInativFilter(){
         <td><span class="badge ${st.c}">${st.t}</span></td>
       </tr>`;
 
-    if(multiFilial){
+    if(mostraFiliais){
       // ── NÍVEL 2: FILIAIS — cada uma abre suas famílias ──
       g.filiais.forEach((f, fi) => {
         const selfId = `f-${gi}-${fi}`;
