@@ -5011,10 +5011,17 @@ function acumularPlanoImportado(dadosPlano, origemInfo = null, acaoDuplicidade =
 
   if (!PLANO_BY_REP[rep]) PLANO_BY_REP[rep] = [];
 
-  const idx = PLANO_BY_REP[rep].findIndex(p =>
+  let idx = PLANO_BY_REP[rep].findIndex(p =>
     String(p.periodo || '').toUpperCase() === periodo &&
     String(p.periodoNum || '') === periodoNum
   );
+  // Plano antigo do mesmo representante/período salvo SEM o número (ex.: "trimestral"
+  // sem dizer qual): é o mesmo período — atualiza ele em vez de criar outro ao lado.
+  if (idx < 0 && periodoNum) {
+    const semNum = PLANO_BY_REP[rep].filter(p =>
+      String(p.periodo || '').toUpperCase() === periodo && !String(p.periodoNum || ''));
+    if (semNum.length === 1) idx = PLANO_BY_REP[rep].indexOf(semNum[0]);
+  }
 
   const gruposImportados = (dadosPlano.grupos || []).map(g => ({
     ...g,
@@ -5467,6 +5474,21 @@ async function parsePlanoPlanilha(file){
 
         // Ler worksheet
         const xmlStr = await zip.file('xl/worksheets/sheet1.xml').async('string');
+
+        // Período pelo NOME DA ABA (ex.: "Acompanhamento 3º TRI"), usado quando o
+        // título da seção não traz o trimestre/semestre (ex.: só "(61) Ativa").
+        let periodoDaAba = null;
+        try {
+          const wbFile = zip.file('xl/workbook.xml');
+          if (wbFile) {
+            const wbXml = await wbFile.async('string');
+            const m = wbXml.match(/<sheet\b[^>]*\bname="([^"]*)"/i);
+            const nomeAba = m ? m[1] : '';
+            const nAba = nomeAba.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+            const mp = nAba.match(/(\d)\s*[º°O]?\s*(TRI|SEM)/);
+            if (mp) periodoDaAba = { periodo: mp[2] === 'SEM' ? 'SEMESTRAL' : 'TRIMESTRAL', num: mp[1] };
+          }
+        } catch (e) { periodoDaAba = null; }
         const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
 
         let rows = xmlDoc.querySelectorAll('[tagName="row"]');
@@ -5509,6 +5531,9 @@ async function parsePlanoPlanilha(file){
         let representantePrevio = ''; // Guardar representante da seção anterior
         let objetivoColIndex = 4; // Coluna padrão para objetivo (coluna E, índice 4)
         let totalGrupoColIndex = -1; // Coluna "Total Grupo" (soma já consolidada das filiais), se existir
+        let ultimoAgrupador = null;  // {cod, nome} do último "- Agrupador" lido (para filiais fora da lista)
+        const nomeBase = (v) => String(v || '').replace(/\s*-?\s*Agrupador\s*$/i, '')
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
 
         Array.from(rows).forEach((row, rowIdx) => {
           let cellsArray = row.querySelectorAll('c');
@@ -5557,9 +5582,11 @@ async function parsePlanoPlanilha(file){
 
           // Cabeçalhos com período podem aparecer em qualquer ponto do arquivo (múltiplas seções).
           // Cabeçalho contendo apenas "REPRESENTAÇÕES" continua aceito no início como compatibilidade.
+          // Formato 6: "(61) Ativa" — só o código e o nome; o período vem do nome da aba.
           const isSecaoHeader = (temRepresentante && temPeriodo) ||
             (rowIdx < 10 && tituloNorm.includes('REPRESENTACOES')) ||
-            (rowIdx < 10 && temCodigoRepresentante && temPeriodo);
+            (rowIdx < 10 && temCodigoRepresentante && temPeriodo) ||
+            (rowIdx < 10 && !secaoAtual && temCodigoRepresentante && !!periodoDaAba);
 
           if (rowIdx < 20 && tituloNorm.includes('REPRESENTACOES')) {
             console.log(`  [Row ${rowNum}] Verificando: "${firstCellVal}" → seção=${isSecaoHeader}`);
@@ -5588,6 +5615,10 @@ async function parsePlanoPlanilha(file){
             } else if (tituloNorm.includes('TRIMESTRE')) {
               const match = firstCellVal.match(/(\d+)\s*[º°]?\s*TRIMESTRE/i);
               secaoAtual.periodoNum = match ? match[1] : '';
+            } else if (periodoDaAba) {
+              // título sem período: usa o do nome da aba ("Acompanhamento 3º TRI")
+              secaoAtual.periodo = periodoDaAba.periodo;
+              secaoAtual.periodoNum = periodoDaAba.num;
             }
 
             // Extrair representante (múltiplos formatos)
@@ -5611,6 +5642,10 @@ async function parsePlanoPlanilha(file){
                   const match4 = firstCellVal.match(/^(.+?)\s+Planos/i);
                   if (match4) {
                     secaoAtual.representante = match4[1].trim().toUpperCase();
+                  } else {
+                    // Formato 6: "(61) Ativa" — o nome depois do código
+                    const match6 = firstCellVal.match(/^\s*\(\d+\)\s+(.+?)\s*$/);
+                    if (match6) secaoAtual.representante = match6[1].trim().toUpperCase();
                   }
                 }
               }
@@ -5730,6 +5765,7 @@ async function parsePlanoPlanilha(file){
               // SOBRESCREVEM os do grupo em vez de somar em cima do que as
               // filiais já processadas tiverem acrescentado.
               const grupoDestino = getOrCreateGrupo(codCli, nomeAgrupador, uf);
+              ultimoAgrupador = { cod: codCli, nome: nomeBase(cliente) };
               const totalConsolidado = totalGrupoColIndex >= 0
                 ? (parseFloat(getCellValue(cellMap, totalGrupoColIndex)) || 0)
                 : total;
@@ -5759,6 +5795,16 @@ async function parsePlanoPlanilha(file){
               }
 
               console.log(`      • [GRUPO] ${nomeAgrupador}: R$ ${totalConsolidado.toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})} / R$ ${objetivo.toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})}`);
+            } else if (!codCliPai && ultimoAgrupador && !objetivo && nomeBase(cliente) === ultimoAgrupador.nome) {
+              // Filial que não está na lista de filiais da aba auxiliar, mas vem
+              // logo abaixo do agrupador com o MESMO nome (ex.: mais uma
+              // "BEZERRA & OLIVEIRA"): entra nesse grupo em vez de virar
+              // "CLIENTE TRIMESTRAIS".
+              const grupoDestino = getOrCreateGrupo(ultimoAgrupador.cod, codigoAgrupadorMap[ultimoAgrupador.cod] || cliente, uf);
+              grupoDestino.clientes.push({
+                uf: uf, codCli: codCli, cliente: cliente, total: total,
+                objetivo: 0, falta: 0, resultadoPct: 0, periodo: secaoAtual.periodo
+              });
             } else if (codCliPai) {
               // Linha de uma filial: entra na lista de filiais do grupo pai,
               // sem alterar os totais do grupo (que vêm da linha do agrupador).
