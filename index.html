@@ -3814,20 +3814,15 @@ function contarNaoComprouGlobalSemFiltros(mesIdx){
   let count = 0;
   if(!INATIV_DATA || !INATIV_DATA.grupos) return 0;
 
+  // Conta GRUPOS sem venda no mês: o grupo não comprou ("NÃO") ou alguma filial
+  // dele não comprou ("⚠ filial s/ venda") — exatamente as linhas que aparecem
+  // no filtro "✗ Não comprou" da coluna do mês.
   INATIV_DATA.grupos.forEach(grupo => {
     // Pular grupos excluídos da análise
     if(grupoExcluido(grupo.nome)) return;
-
-    // Contar APENAS as filiais que não compraram
-    if(grupo.filiais && grupo.filiais.length > 0) {
-      grupo.filiais.forEach(filial => {
-        if(filial.vals && filial.vals[mesIdx] === 0) {
-          count++;
-        }
-      });
-    }
+    if(gGrupoTemSemVenda(grupo, mesIdx)) count++;
   });
-  return Math.max(0, count);
+  return count;
 }
 
 // Contar quantos CLIENTES/FILIAIS não compraram em um mês específico, COM filtros
@@ -3886,7 +3881,7 @@ function updateInativResultado(){
         // Se achou o mês, contar; se não achou, usar o último
         if(mesIdx === -1) mesIdx = INATIV_DATA.months.length - 1;
         const countNaoComprou = contarNaoComprouGlobalSemFiltros(mesIdx);
-        sv('inativ-total', Math.max(0, countNaoComprou - 1).toString());
+        sv('inativ-total', countNaoComprou.toString());
       }
     }
   }
@@ -4305,9 +4300,9 @@ function renderInativImported(){
   const m = INATIV_DATA.months;
 
   // Contar quantos CLIENTES/FILIAIS não compraram em cada mês SEM aplicar filtros
-  const count1 = Math.max(0, contarNaoComprouGlobalSemFiltros(0) - 1);
-  const count2 = Math.max(0, contarNaoComprouGlobalSemFiltros(1) - 1);
-  const count3 = Math.max(0, contarNaoComprouGlobalSemFiltros(2) - 1);
+  const count1 = contarNaoComprouGlobalSemFiltros(0);
+  const count2 = contarNaoComprouGlobalSemFiltros(1);
+  const count3 = contarNaoComprouGlobalSemFiltros(2);
 
   // Atualizar labels com contagem
   const lbl1=$('lbl-m1'), lbl2=$('lbl-m2'), lbl3=$('lbl-m3');
