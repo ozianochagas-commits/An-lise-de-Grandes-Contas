@@ -6326,6 +6326,8 @@ async function importPlanoExcel(event){
 
     const fileList = Array.from(files);
     let successCount = 0;
+    const importados = [];   // o que entrou (para a mensagem final)
+    const falhas = [];       // arquivos que não entraram e o motivo
 
     for (let file of fileList) {
       try {
@@ -6401,6 +6403,7 @@ async function importPlanoExcel(event){
 
             if (acaoDuplicidade === 'cancelar') {
               console.log(`⏭️  Importação de "${file.name}" cancelada pelo usuário (origem duplicada).`);
+              falhas.push({ arquivo: file.name, motivo: 'importação cancelada (arquivo já importado antes)' });
               continue;
             }
           }
@@ -6414,6 +6417,15 @@ async function importPlanoExcel(event){
             modificado: file.lastModified
           }, acaoDuplicidade);
           successCount++;
+          importados.push({
+            arquivo: file.name,
+            representante: resultadoAcumulo.representante,
+            periodo: resultadoAcumulo.periodo,
+            periodoNum: resultadoAcumulo.periodoNum,
+            grupos: (dadosPlano.grupos || []).length,
+            total: (dadosPlano.grupos || []).reduce((a, g) => a + planoNum(g.total), 0),
+            objetivo: (dadosPlano.grupos || []).reduce((a, g) => a + planoNum(g.objetivo), 0)
+          });
 
           console.log(
             `${resultadoAcumulo.substituido ? '🔄 Substituído' : (resultadoAcumulo.acumulado ? '➕ Somado' : '✅ Importado')}: ` +
@@ -6423,10 +6435,17 @@ async function importPlanoExcel(event){
       } catch (err) {
         console.error(`❌ Erro ao importar ${file.name}:`, err);
         console.error(err.stack);
+        const msg = String(err && err.message || err);
+        falhas.push({
+          arquivo: file.name,
+          motivo: /Nenhum dado encontrado/i.test(msg)
+            ? 'não reconheci a planilha (não achei o título com o representante e o trimestre, nem a linha de cabeçalho UF / CodCli / Cliente)'
+            : (/período/i.test(msg) ? msg : `não reconheci a planilha como Plano de Negócio (detalhe técnico: ${msg})`)
+        });
       }
     }
 
-    const planoSync = await savePlanoByRep();
+    const planoSync = importados.length ? await savePlanoByRep() : null;
 
     // Atualizar interface
     const repSelect = $('plano-rep-select');
@@ -6455,13 +6474,52 @@ async function importPlanoExcel(event){
     }
 
     applyPlanoFilter();
+    mostrarResultadoImportacaoPlano(importados, falhas, planoSync);
   } catch (err) {
     console.error('❌ ERRO GERAL:', err);
     console.error('Stack:', err.stack);
     const statusMsg = `❌ Erro ao importar: ${err.message}`;
     $('plano-import-status').textContent = statusMsg;
+    mostrarResultadoImportacaoPlano([], [{ arquivo: 'importação', motivo: err.message }], null);
     console.log(`📌 Dados em PLANO_BY_REP:`, JSON.stringify(PLANO_BY_REP, null, 2));
+  } finally {
+    // permite escolher o MESMO arquivo de novo (senão o navegador não dispara a importação)
+    try { event.target.value = ''; } catch (e) {}
   }
+}
+
+// Mensagem no fim da importação do Plano: o que entrou (e os números), o que
+// não entrou e por quê, e se foi salvo na nuvem.
+function mostrarResultadoImportacaoPlano(importados, falhas, sync){
+  const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const ok = importados.length > 0;
+  const nomePer = i => i.periodo === 'SEMESTRAL' ? `${i.periodoNum}º Semestre` : `${i.periodoNum}º Trimestre`;
+  let html = '';
+  if (ok) {
+    html += importados.map(i => `<div style="margin:8px 0;padding:10px 12px;border-radius:8px;background:#EEF8F0;border:1px solid #CBE8D2">
+      <div style="font-weight:800;color:#1E7B3A">✅ ${esc(i.representante)} — ${esc(nomePer(i))}</div>
+      <div style="font-size:12px;color:#333;margin-top:4px">${i.grupos} grupo(s) · Faturado <b>${R(i.total)}</b> · Objetivo <b>${R(i.objetivo)}</b></div>
+      <div style="font-size:11px;color:#888;margin-top:2px">${esc(i.arquivo)}</div></div>`).join('');
+    if (sync && sync.cloud) html += `<div style="font-size:12px;color:#1E7B3A;margin-top:6px">☁️ Salvo na nuvem — já aparece para todos.</div>`;
+    else html += `<div style="font-size:12px;color:#B26A00;margin-top:6px">⚠️ Salvo só neste navegador; a nuvem não confirmou${sync && sync.motivo ? ' (' + esc(sync.motivo) + ')' : ''}. Tente importar de novo em instantes.</div>`;
+  }
+  if (falhas.length) {
+    html += falhas.map(f => `<div style="margin:8px 0;padding:10px 12px;border-radius:8px;background:#FDEDEC;border:1px solid #F5C6C2">
+      <div style="font-weight:800;color:#B3261E">❌ ${esc(f.arquivo)}</div>
+      <div style="font-size:12px;color:#333;margin-top:4px">${esc(f.motivo)}</div></div>`).join('');
+  }
+  let ov = document.getElementById('plano-import-result');
+  if (ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'plano-import-result';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML = `<div style="background:#fff;border-radius:12px;max-width:520px;width:100%;max-height:85vh;overflow:auto;padding:20px 22px;box-shadow:0 10px 40px rgba(0,0,0,.3);font-family:inherit">
+    <div style="font-size:16px;font-weight:900;margin-bottom:6px;color:${ok ? '#1E7B3A' : '#B3261E'}">${ok ? (falhas.length ? 'Importação feita em parte' : 'Plano importado com sucesso!') : 'Não foi possível importar'}</div>
+    ${html}
+    <div style="text-align:right;margin-top:14px"><button type="button" style="background:var(--orange);color:#fff;border:0;border-radius:8px;padding:9px 22px;font-weight:800;cursor:pointer" onclick="document.getElementById('plano-import-result').remove()">OK</button></div>
+  </div>`;
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
 }
 
 // Função de diagnóstico: chamar pelo console!
