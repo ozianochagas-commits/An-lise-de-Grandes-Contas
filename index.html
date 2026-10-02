@@ -234,6 +234,16 @@
 
   .page{display:none;padding:24px 32px;max-width:1440px;margin:0 auto;}
   .page.active{display:block;}
+  /* Atualizou a página: abre direto na seção em que estava (o atributo sai assim que o sistema termina de carregar) */
+  html[data-secao] .page{display:none;}
+  html[data-secao="dashboard"] #page-dashboard{display:block;}
+  html[data-secao="previsoes"] #page-previsoes{display:block;}
+  html[data-secao="trimestre"] #page-trimestre{display:block;}
+  html[data-secao="inatividade"] #page-inatividade{display:block;}
+  html[data-secao="plano"] #page-plano{display:block;}
+  html[data-secao="agenda"] #page-agenda{display:block;}
+  html[data-secao="cliente360"] #page-cliente360{display:block;}
+  html[data-secao="transporte"] #page-transporte{display:block;}
   /* Aba Agenda: ocupa a tela toda (sem margens/limite), como o site aberto direto */
   #page-agenda{padding:0 !important;max-width:none !important;margin:0 !important;}
   #page-agenda .agenda-card{border-radius:0;box-shadow:none;}
@@ -1018,6 +1028,13 @@
   });
 </script>
 
+<script>
+// Marca a seção salva já no começo do carregamento (evita piscar o Dashboard ao atualizar)
+try{
+  var __sec = sessionStorage.getItem('secao_atual');
+  if(__sec && /^[a-z0-9]+$/.test(__sec) && !/[#&](s|b|d)=|[?&]view=/.test(location.hash + location.search)) document.documentElement.setAttribute('data-secao', __sec);
+}catch(e){}
+</script>
 </head>
 <body>
 
@@ -1065,6 +1082,7 @@
     <option value="cliente360">🎯 Cliente 360</option>
     <option value="transporte">🚚 Gestão de Transporte</option>
   </select>
+  <script>try{var __s=sessionStorage.getItem('secao_atual'),__n=document.getElementById('nav-select');if(__s&&__n&&document.documentElement.hasAttribute('data-secao'))__n.value=__s;}catch(e){}</script>
   <div class="usuario-box" id="usuario-box">
     <span class="nav-label">👤 Usuário:</span>
     <select id="usuario-select" onchange="trocarUsuarioSistema(this.value)">
@@ -3161,6 +3179,7 @@ function showTab(el,id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   el.classList.add('active'); $('page-'+id).classList.add('active');
   currentTab = id;
+  document.documentElement.removeAttribute('data-secao');
   // lembra a seção aberta: ao atualizar a página (F5 / sistema novo) volta nela
   if(!window.__linkCompartilhado){ try{ sessionStorage.setItem(CHAVE_SECAO_ATUAL, id); }catch(e){} }
   // mantém a lista suspensa sincronizada com a seção atual
@@ -7926,6 +7945,7 @@ async function initDashboard() {
       }
     }catch(e){}
   }
+  document.documentElement.removeAttribute('data-secao');   // segurança: nunca deixa a página sem seção visível
 
   // 6. Abrir aba Plano se tiver parâmetro view=plano
   const viewParam = urlParams.get('view');
