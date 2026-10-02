@@ -1485,6 +1485,7 @@ try{
     <select id="inativ-rep-select" onchange="onInativRepChange()" style="padding:8px 14px;border:2px solid var(--orange);border-radius:7px;font-size:12px;font-weight:700;color:var(--dark);background:#FFF8F5;cursor:pointer;min-width:240px;">
       <option value="">Todos os Representantes</option>
     </select>
+    <button id="inativ-del-btn" class="pdf-btn" onclick="excluirRepInativ()" title="Apaga este representante da análise de Clientes Inativos (use para tirar nomes duplicados ou antigos)" style="display:none;margin:0;background:#C0392B;font-size:11px;padding:8px 16px;">🗑 Excluir este representante</button>
     <button class="pdf-btn" onclick="gerarLinkPorRep()" style="margin:0;background:#1E7E34;font-size:11px;padding:8px 16px;">
       <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:white;"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>
       Link deste Representante
@@ -1584,6 +1585,7 @@ try{
     <select id="plano-rep-select" onchange="onPlanoRepChange()" style="padding:8px 14px;border:2px solid var(--orange);border-radius:7px;font-size:12px;font-weight:700;color:var(--dark);background:#FFF8F5;cursor:pointer;min-width:240px;">
       <option value="">Todos os Representantes</option>
     </select>
+    <button id="plano-del-btn" class="pdf-btn" onclick="excluirRepPlano()" title="Apaga este representante do Plano de Negócio (use para tirar nomes duplicados ou antigos)" style="display:none;margin:0;background:#C0392B;font-size:11px;padding:8px 16px;">🗑 Excluir este representante</button>
     <button id="plano-reimport-btn" class="pdf-btn" onclick="document.getElementById('plano-file-input').click()" style="margin:0;background:var(--dark);font-size:11px;padding:8px 16px;">
       <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 4h5v7h7v9H6V4z"/></svg>
       Reimportar / Adicionar
@@ -4226,6 +4228,7 @@ function refreshInativForRep(){
 
   renderInativImported();
   updateInativResultado();   // sincroniza o "Resultado do Mês" com o mês da planilha
+  atualizarBotoesExcluirRep();
 }
 
 // Combina TODOS os representantes: cada CliAgrup aparece uma vez, e cada filial
@@ -6776,6 +6779,58 @@ function onPlanoRepChange(){
   applyPlanoFilter();
 }
 
+// ══════════ EXCLUIR REPRESENTANTE (nome duplicado ou antigo) ══════════
+// O botão 🗑 aparece ao lado do seletor quando um representante está escolhido.
+function atualizarBotoesExcluirRep(){
+  const pode = !window.__linkCompartilhado;
+  [['plano-rep-select','plano-del-btn'],['inativ-rep-select','inativ-del-btn']].forEach(([selId, btnId]) => {
+    const sel = $(selId), btn = $(btnId);
+    if(sel && btn) btn.style.display = (pode && sel.value) ? '' : 'none';
+  });
+}
+document.addEventListener('change', e => {
+  if(e.target && (e.target.id === 'plano-rep-select' || e.target.id === 'inativ-rep-select')) atualizarBotoesExcluirRep();
+});
+
+// Plano de Negócio: apaga na nuvem (Supabase) e neste navegador
+async function excluirRepPlano(){
+  const sel = $('plano-rep-select'); const rep = sel && sel.value;
+  if(!rep) return;
+  const qtd = (PLANO_BY_REP[rep] || []).reduce((n, pl) => n + (pl.grupos || []).length, 0);
+  if(!confirm(`Excluir o representante "${rep}" do Plano de Negócio?\n\nIsso apaga os ${qtd} grupo(s) dele, para todos os usuários. Não dá para desfazer (só importando a planilha de novo).`)) return;
+  initSupabase();
+  if(!window.supabaseClient){ alert('Sem conexão com a nuvem agora. Nada foi apagado; tente de novo com internet.'); return; }
+  try{
+    const { error } = await window.supabaseClient.from(PLANO_TABLE).delete().eq('representante', rep);
+    if(error) throw error;
+  }catch(err){
+    alert('Não consegui excluir na nuvem: ' + (err && err.message ? err.message : err) + '\nNada foi apagado.');
+    return;
+  }
+  delete PLANO_BY_REP[rep];
+  try{ localStorage.setItem('PLANO_BY_REP', JSON.stringify(PLANO_BY_REP)); }catch(e){}
+  registrarAuditoria('Excluiu representante do Plano', rep);
+  sel.value = '';
+  refreshPlanoDisplay();
+  atualizarBotoesExcluirRep();
+  showNotification(`🗑 ${rep} excluído do Plano de Negócio`);
+}
+
+// Clientes Inativos: apaga a análise importada deste representante (fica neste navegador)
+function excluirRepInativ(){
+  const sel = $('inativ-rep-select'); const rep = sel && sel.value;
+  if(!rep) return;
+  const qtd = ((INATIV_BY_REP[rep] || {}).grupos || []).length;
+  if(!confirm(`Excluir o representante "${rep}" da análise de Clientes Inativos?\n\nIsso apaga os ${qtd} grupo(s) dele. Não dá para desfazer (só importando a planilha de novo).`)) return;
+  delete INATIV_BY_REP[rep];
+  saveInativByRep();
+  registrarAuditoria('Excluiu representante de Clientes Inativos', rep);
+  sel.value = '';
+  refreshInativForRep();
+  atualizarBotoesExcluirRep();
+  showNotification(`🗑 ${rep} excluído de Clientes Inativos`);
+}
+
 // ══════════ VENDA QUE PASSA PARA OUTRO REPRESENTANTE (por Estado) ══════════
 // Dono de cada Estado pela região do representante (Norte/Nordeste). Uma filial
 // do plano de um representante que fica em Estado de OUTRO tem a venda
@@ -6864,6 +6919,7 @@ function applyPlanoFilter(){
   }
 
   renderPlanoTable(filteredData);
+  atualizarBotoesExcluirRep();
 }
 
 function formatMoney(value) {
