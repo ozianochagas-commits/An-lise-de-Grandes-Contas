@@ -3154,12 +3154,15 @@ function loadDataTrim(){
 
 // ── TAB SWITCH ─────────────────────────────────────────────────
 let currentTab = 'dashboard';
+const CHAVE_SECAO_ATUAL = 'secao_atual';
 
 function showTab(el,id){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   el.classList.add('active'); $('page-'+id).classList.add('active');
   currentTab = id;
+  // lembra a seção aberta: ao atualizar a página (F5 / sistema novo) volta nela
+  if(!window.__linkCompartilhado){ try{ sessionStorage.setItem(CHAVE_SECAO_ATUAL, id); }catch(e){} }
   // mantém a lista suspensa sincronizada com a seção atual
   const nv = document.getElementById('nav-select'); if(nv && nv.value !== id) nv.value = id;
   if(id === 'agenda') carregarAgenda();
@@ -7911,6 +7914,17 @@ async function initDashboard() {
   // 5. Link da nuvem que não carregou → avisa
   if(window.__shareLoadError){
     setTimeout(()=>{ alert('⚠️ Não foi possível carregar os dados deste link.\nPode ser falta de internet ou o link expirou. Peça um link novo.'); }, 300);
+  }
+
+  // 5.5. Atualizou a página? Volta para a mesma seção em que estava (link compartilhado: não mexe)
+  if(!shared && !urlParams.get('view')){
+    try{
+      const salva = sessionStorage.getItem(CHAVE_SECAO_ATUAL);
+      if(salva && salva !== currentTab && document.getElementById('page-' + salva)){
+        const aba = Array.from(document.querySelectorAll('.tab')).find(t => (t.getAttribute('onclick') || '').indexOf("'" + salva + "'") >= 0);
+        if(aba) showTab(aba, salva);
+      }
+    }catch(e){}
   }
 
   // 6. Abrir aba Plano se tiver parâmetro view=plano
