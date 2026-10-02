@@ -272,7 +272,7 @@
   .kcard.k4{background:linear-gradient(135deg,#B22222,#E74C3C);}
   .kcard.k5{background:linear-gradient(135deg,#FE5000,#B22222);}
   .kl{font-size:9px;font-weight:700;letter-spacing:1.5px;opacity:.75;text-transform:uppercase;}
-  .kv{font-size:21px;font-weight:900;margin:6px 0 2px;line-height:1;}
+  .kv{font-size:19px;font-weight:900;margin:6px 0 2px;line-height:1;white-space:nowrap;}
   .ks{font-size:9px;opacity:.65;}
   .ki{position:absolute;top:14px;right:14px;font-size:20px;opacity:.45;}
 
@@ -1909,14 +1909,15 @@ const TBASE = TRIMESTRES[currentTrimestre].data;
 
 
 // ── HELPERS ─────────────────────────────────────────────────────
-const R  = v => 'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0});
+// Valores em reais SEMPRE com centavos, em todo o sistema (a soma tem que bater com a planilha)
+const R  = v => 'R$\u00A0'+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const P  = v => (v*100).toFixed(1)+'%';
 const $  = id => document.getElementById(id);
 const sv = (id,v) => { const e=$(id); if(e) e.textContent=v; };
 const si = (id,h) => { const e=$(id); if(e) e.innerHTML=h; };
 const fmtN = v => v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 // Valor em reais COM centavos (totais da aba Editar Dados: a soma tem que bater com a planilha)
-const R2 = v => 'R$ ' + fmtN(v);
+const R2 = R;
 function parse(id){ const e=$(id); return e ? parseFloat(e.value.replace(/\./g,'').replace(',','.')) || 0 : 0; }
 function fmtInp(el){ el.value = fmtN(parseFloat(el.value.replace(/\./g,'').replace(',','.')) || 0); }
 function badge(p){ return p>=1?{c:'batida',t:'META BATIDA'}:p>=0.8?{c:'risco',t:'EM RISCO'}:{c:'critico',t:'CRÍTICO'}; }
@@ -2688,7 +2689,7 @@ function recalcTrim(){
     sv('t-real-'+i, R(total));
     sv('t-pct-txt-'+i, P(pct));
     if($('t-pct-bar-'+i)) $('t-pct-bar-'+i).style.width=Math.min(pct*100,100)+'%';
-    sv('t-gap-'+i, gap>0?'-'+R(gap).replace('R$ ',''):R(0));
+    sv('t-gap-'+i, gap>0?'-'+R(gap).replace(/R\$\s*/,''):R(0));
     if($('t-gap-'+i)) $('t-gap-'+i).style.color=gap>0?'var(--red)':'var(--green)';
     si('t-st-'+i, `<span class="badge ${bg.c}">${bg.t}</span>`);
   });
@@ -2708,7 +2709,7 @@ function recalcTrim(){
   sv('t-kpi-gap', tGap>0?R(tGap):R(0));
   sv('tft-meta',R(tM)); sv('tft-jan',R(sM1)); sv('tft-fev',R(sM2)); sv('tft-mar',R(sM3));
   sv('tft-real',R(tR)); sv('tft-pct',P(tPct));
-  sv('tft-gap', tGap>0?'-'+R(tGap).replace('R$ ',''):R(0));
+  sv('tft-gap', tGap>0?'-'+R(tGap).replace(/R\$\s*/,''):R(0));
   sv('t-total-real',R(tR)); sv('t-total-pct',P(tPct)+' da meta');
   renderTrimChart(disp);
   // Salva automaticamente no navegador
@@ -2784,7 +2785,7 @@ function renderTrimTable(){
         <td style="background:#FFF8F5"><input class="einput ri" id="t-${keys[2]}-${i}" type="text" value="${fmtN(r[keys[2]])}" oninput="recalcTrim(); saveDataTrim()" onblur="fmtInp(this)"></td>
         <td id="t-real-${i}" style="font-weight:700">${R(total)}</td>
         <td><div id="t-pct-txt-${i}" style="font-weight:700;font-size:11px;color:var(--orange)">${P(pct)}</div><div class="pwrap"><div class="pbar" id="t-pct-bar-${i}" style="width:${Math.min(pct*100,100)}%;background:var(--orange)"></div></div></td>
-        <td id="t-gap-${i}" style="font-weight:700;color:${gap>0?'var(--red)':'var(--green)'}">${gap>0?'-'+R(gap).replace('R$ ',''):R(0)}</td>
+        <td id="t-gap-${i}" style="font-weight:700;color:${gap>0?'var(--red)':'var(--green)'}">${gap>0?'-'+R(gap).replace(/R\$\s*/,''):R(0)}</td>
         <td id="t-st-${i}"><span class="badge ${bg.c}">${bg.t}</span></td>
       </tr>`;
   });
@@ -3024,7 +3025,7 @@ function renderTrimChart(tv){
     const pct=r.metaTrim>0?tot/r.metaTrim:0;
     const sn=r.name.length>12?r.name.substring(0,11)+'…':r.name;
     chart.innerHTML+=`<div class="bgrp"><div class="bars">
-      <div class="bar" style="height:${hM}px;background:#555"><span class="bpct" style="color:#333">${R(r.metaTrim).replace('R$ ','')}</span></div>
+      <div class="bar" style="height:${hM}px;background:#555"><span class="bpct" style="color:#333">${R(r.metaTrim).replace(/R\$\s*/,'')}</span></div>
       <div class="bar pj" style="height:${hR}px"><span class="bpct" style="color:var(--orange)">${P(pct)}</span></div>
     </div><div class="bname">${sn}</div></div>`;
   });
