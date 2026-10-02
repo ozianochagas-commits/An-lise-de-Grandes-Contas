@@ -1915,6 +1915,8 @@ const $  = id => document.getElementById(id);
 const sv = (id,v) => { const e=$(id); if(e) e.textContent=v; };
 const si = (id,h) => { const e=$(id); if(e) e.innerHTML=h; };
 const fmtN = v => v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+// Valor em reais COM centavos (totais da aba Editar Dados: a soma tem que bater com a planilha)
+const R2 = v => 'R$ ' + fmtN(v);
 function parse(id){ const e=$(id); return e ? parseFloat(e.value.replace(/\./g,'').replace(',','.')) || 0 : 0; }
 function fmtInp(el){ el.value = fmtN(parseFloat(el.value.replace(/\./g,'').replace(',','.')) || 0); }
 function badge(p){ return p>=1?{c:'batida',t:'META BATIDA'}:p>=0.8?{c:'risco',t:'EM RISCO'}:{c:'critico',t:'CRÍTICO'}; }
@@ -2646,10 +2648,10 @@ function recalc(){
   }
 
   // 8. Rodapé da aba "Editar Dados" e painel de resumo (segue o filtro de representantes)
-  sv('pft-meta',R(tM)); sv('pft-real',R(tR)); sv('pft-prev',R(tP)); sv('pft-car',R(tC));
-  sv('pft-proj',R(tProj)); sv('pft-atp',P(tAtp)); sv('pft-real-car-pct',P(tReal_car)); sv('pft-prj',P(tPrj));
-  sv('pv-meta',R(tM)); sv('pv-real',R(tR)); sv('pv-prev',R(tP));
-  sv('pv-proj',R(tProj)); sv('pv-pct',P(tPrj)+' da meta');
+  sv('pft-meta',R2(tM)); sv('pft-real',R2(tR)); sv('pft-prev',R2(tP)); sv('pft-car',R2(tC));
+  sv('pft-proj',R2(tProj)); sv('pft-atp',P(tAtp)); sv('pft-real-car-pct',P(tReal_car)); sv('pft-prj',P(tPrj));
+  sv('pv-meta',R2(tM)); sv('pv-real',R2(tR)); sv('pv-prev',R2(tP));
+  sv('pv-proj',R2(tProj)); sv('pv-pct',P(tPrj)+' da meta');
   sv('pv-atp',P(tAtp)); sv('pv-prj',P(tPrj));
   sv('hero-proj',R(tProj)); sv('hero-pct',P(tPrj)+' da meta');
   // Atualiza o nome do mês na Projeção Total
