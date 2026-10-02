@@ -33,7 +33,7 @@
   #nav-select option{background:#fff;color:#222;font-weight:700;}
   @media(max-width:600px){ .nav-bar{padding:8px 16px;} #nav-select{min-width:0;flex:1;} }
   .usuario-box{display:flex;align-items:center;gap:8px;margin-left:auto;}
-  #usuario-select{background:var(--orange);color:#fff;border:2px solid var(--orange);border-radius:8px;padding:9px 14px;font-size:13px;font-weight:800;cursor:pointer;outline:none;min-width:150px;}
+  #usuario-select{background:var(--orange);color:#fff;border:2px solid var(--orange);border-radius:6px;padding:4px 8px;font-size:12px;font-weight:800;cursor:pointer;outline:none;min-width:100px;}
   #usuario-select option{background:#fff;color:#222;font-weight:700;}
   #usuario-regiao{font-size:10px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,.65);text-transform:uppercase;}
   @media(max-width:600px){ .usuario-box{margin-left:0;width:100%;} #usuario-select{flex:1;} }
@@ -223,6 +223,8 @@
        (.cenario-block) evita quebrar no meio */
     .page.print-target .print-only-cenario { display:block !important; margin-top:8px !important; page-break-inside:auto !important; }
     .print-only-cenario .stitle { font-size:10px !important; padding:7px 10px !important; margin-bottom:6px !important; }
+    /* sem nenhum cliente no Cenário Comercial: não imprime o bloco (evita página extra só com o aviso) */
+    .page.print-target .print-only-cenario.vazio { display:none !important; }
     .cenario-block { page-break-inside:avoid; margin-bottom:8px; }
     .cenario-block .cb-title { font-weight:900; font-size:9px; color:var(--orange); margin:6px 0 3px; }
     .cenario-block table { font-size:8px !important; width:100%; border-collapse:collapse; }
@@ -2849,6 +2851,9 @@ function buildCenarioDetalhe(vals){
   });
 
   wrap.innerHTML = html || '<div style="font-size:9px;color:#999;padding:6px 0">Nenhum cliente no Cenário Comercial para os representantes selecionados.</div>';
+  // Vazio: marca o bloco para não ir ao PDF (título + aviso ocupavam uma página extra)
+  const bloco = wrap.closest('.print-only-cenario');
+  if(bloco) bloco.classList.toggle('vazio', !html);
 }
 
 function showClientTooltip(repIdx, event){
