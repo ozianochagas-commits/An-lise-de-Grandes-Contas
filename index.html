@@ -3227,14 +3227,19 @@ function sincronizarTransporte(){
 }
 
 // Representantes marcados no filtro do topo → filtro da Gestão de Transporte.
-// Todos marcados (ou nenhum) = sem filtro.
+// Todos marcados (ou nenhum) = todos os representantes da REGIÃO do usuário
+// (Brasil = sem filtro). Assim Pamela (Sul e Sudeste) não vê os pedidos do Norte.
 function enviarRepsAoTransporte(){
   try{
     const w = $('transporte-frame') && $('transporte-frame').contentWindow;
     if(!w || typeof w.definirRepresentantesExternos !== 'function') return;
     const cbs = document.querySelectorAll('.rep-checkbox');
     const sel = selectedRepNames();
-    w.definirRepresentantesExternos((sel.length === 0 || sel.length === cbs.length) ? null : sel);
+    if(sel.length && sel.length < cbs.length){ w.definirRepresentantesExternos(sel); return; }
+    const r = regiaoAtual();
+    if(__regiaoDesligada || !r.reps){ w.definirRepresentantesExternos(null); return; }
+    // Pedidos sem representante só aparecem para a região que a planilha de transporte atende
+    w.definirRepresentantesExternos(r.transporteSemRep ? r.reps.concat('Sem representante') : r.reps);
   }catch(e){}
 }
 
@@ -3272,7 +3277,8 @@ function aplicarConfigRegioes(cfg){
 }
 const REGIOES = {
   NN: {nome:'Norte e Nordeste', titulo:'NORTE &nbsp;•&nbsp; NORDESTE &nbsp;•&nbsp; RIO',
-       reps:['ATIVA REPRESENTAÇÕES','RBR REPRESENTAÇÕES','IG REPRESENTAÇÕES','PEREIRA MEDINA AM','PEREIRA MEDINA (AP e PA)']},
+       reps:['ATIVA REPRESENTAÇÕES','RBR REPRESENTAÇÕES','IG REPRESENTAÇÕES','PEREIRA MEDINA AM','PEREIRA MEDINA (AP e PA)'],
+       transporteSemRep:true},   // a Gestão de Transporte é dos pedidos do Norte/Nordeste
   SS: {nome:'Sul e Sudeste', titulo:'SUL &nbsp;•&nbsp; SUDESTE',
        reps:['ALCA REPRESENTAÇÕES','CONVERT REPRESENTAÇÕES','BROCK REPRESENTAÇÕES','PROATIVA REPRESENTAÇÕES',
              'DIRETO SC','DIRETO RS','MARK PRESS REPRESENTAÇÕES','JUNIORCAR REPRESENTAÇÕES']},
