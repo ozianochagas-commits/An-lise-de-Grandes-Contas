@@ -4324,8 +4324,10 @@ async function importAllMapped(){
 
 // Atualiza a UII a partir de INATIV_DATA (usado pela importação e pelo link compartilhado)
 function renderInativImported(){
-  if(!INATIV_DATA || !INATIV_DATA.grupos || !INATIV_DATA.grupos.length) return;
-  const m = INATIV_DATA.months;
+  // Mesmo sem grupos (ex.: região do usuário sem clientes na planilha) a tela
+  // precisa ser redesenhada, senão continua mostrando a lista do usuário anterior.
+  if(!INATIV_DATA || !INATIV_DATA.grupos) return;
+  const m = INATIV_DATA.months || [];
 
   // Contar quantos CLIENTES/FILIAIS não compraram em cada mês SEM aplicar filtros
   const count1 = contarNaoComprouGlobalSemFiltros(0);
@@ -4666,8 +4668,15 @@ function toggleInativRow(type, id){
 }
 
 function applyInativFilter(){
-  if(!INATIV_DATA.grupos.length) return;
   const tbody = $('inativ-tbody');
+  if(!tbody) return;
+  if(!INATIV_DATA.grupos.length){
+    sv('inativ-total', '0');
+    const r = regiaoAtual();
+    const onde = (!__regiaoDesligada && r.reps) ? ` da região <b>${r.nome}</b>` : '';
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#999;padding:20px">Nenhum cliente${onde} na planilha importada</td></tr>`;
+    return;
+  }
   tbody.innerHTML = '';
   const months = INATIV_DATA.months;
 
