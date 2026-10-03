@@ -4241,7 +4241,7 @@ function refreshInativForRep(){
 }
 
 // Painel por representante: um painel por representante (Todos) ou só o escolhido.
-// Mostra, no mês selecionado, quantos grupos compraram e quantos não compraram.
+// Mostra, no mês selecionado, quantos clientes/filiais compraram e quantos não compraram (mesma conta do cabeçalho do mês).
 function renderInativRepPanel(escolhido){
   const box = $('inativ-rep-panel'); if(!box) return;
   const months = (INATIV_DATA && INATIV_DATA.months) || [];
@@ -4264,8 +4264,15 @@ function renderInativRepPanel(escolhido){
   box.innerHTML = reps.map(rep => {
     // aplica a busca e os filtros da tabela (colunas de mês / atalho) aos grupos deste representante
     const grupos = getFilteredInativGrupos(((INATIV_BY_REP[rep]||{}).grupos || []).filter(g => !grupoExcluido(g.nome)));
-    const naoComprou = grupos.filter(g => g.vals && g.vals[mesIdx] === 0).length;
-    const comprou = grupos.length - naoComprou;
+    // Mesma conta do número do cabeçalho do mês: grupo que não comprou conta 1;
+    // grupo que comprou conta cada filial sem venda (não comprou) e cada filial que comprou (comprou).
+    let naoComprou = 0, comprou = 0;
+    grupos.forEach(g => {
+      if(g.vals && g.vals[mesIdx] === 0){ naoComprou++; return; }
+      const sem = nFiliaisSemVenda(g, mesIdx);
+      naoComprou += sem;
+      comprou += (g.filiais || []).length - sem;
+    });
     const nome = String(rep).replace(/&/g,'&amp;').replace(/</g,'&lt;');
     return `<div style="background:white;border-radius:12px;padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px;">
