@@ -4245,16 +4245,7 @@ function refreshInativForRep(){
 function renderInativRepPanel(escolhido){
   const box = $('inativ-rep-panel'); if(!box) return;
   const months = (INATIV_DATA && INATIV_DATA.months) || [];
-  let mesIdx = Math.max(0, months.length - 1);
-  if(currentMonth && months.length){
-    const ab = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const pt = currentMonth.split('-');
-    if(pt.length === 2){
-      const alvo = ((ab[parseInt(pt[1])]||'') + './' + pt[0].slice(-2)).toLowerCase();
-      const i = months.findIndex(m => m && m.toLowerCase().includes(alvo));
-      if(i >= 0) mesIdx = i;
-    }
-  }
+  const mesIdx = Math.max(0, months.length - 1);   // sempre o ÚLTIMO mês da planilha (ex.: Set./26)
   let reps = Object.keys(INATIV_BY_REP).filter(repNaRegiao).sort();
   if(escolhido) reps = reps.filter(r => r === escolhido);
   const mes = months[mesIdx] || '';
