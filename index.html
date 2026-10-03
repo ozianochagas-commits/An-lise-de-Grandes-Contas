@@ -4258,16 +4258,17 @@ function renderInativRepPanel(escolhido){
   let reps = Object.keys(INATIV_BY_REP).filter(repNaRegiao).sort();
   if(escolhido) reps = reps.filter(r => r === escolhido);
   const mes = months[mesIdx] || '';
-  const tile = (num, label, cor, fundo) => `<div style="flex:1;min-width:0;background:${fundo};border-left:4px solid ${cor};border-radius:10px;padding:12px 14px;text-align:center;">
+  const tile = (num, label, cor, fundo, extra) => `<div style="flex:1;min-width:0;background:${fundo};border-left:4px solid ${cor};border-radius:10px;padding:12px 14px;text-align:center;">
       <div style="font-size:30px;font-weight:900;color:${cor};line-height:1.1;">${num}</div>
-      <div style="font-size:10px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-top:4px;white-space:nowrap;">${label}</div></div>`;
+      <div style="font-size:10px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-top:4px;white-space:nowrap;">${label}</div>${extra ? `<div style="font-size:13px;font-weight:900;color:${cor};margin-top:6px;">${extra}</div>` : ''}</div>`;
   box.innerHTML = reps.map(rep => {
     // aplica a busca e os filtros da tabela (colunas de mês / atalho) aos grupos deste representante
     const grupos = getFilteredInativGrupos(((INATIV_BY_REP[rep]||{}).grupos || []).filter(g => !grupoExcluido(g.nome)));
     // Mesma conta do número do cabeçalho do mês: grupo que não comprou conta 1;
     // grupo que comprou conta cada filial sem venda (não comprou) e cada filial que comprou (comprou).
-    let naoComprou = 0, comprou = 0;
+    let naoComprou = 0, comprou = 0, vendido = 0;
     grupos.forEach(g => {
+      vendido += (g.vals && g.vals[mesIdx]) || 0;
       if(g.vals && g.vals[mesIdx] === 0){ naoComprou++; return; }
       const sem = nFiliaisSemVenda(g, mesIdx);
       naoComprou += sem;
@@ -4279,7 +4280,7 @@ function renderInativRepPanel(escolhido){
         <span title="${nome}" style="font-size:12px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">👤 ${nome}</span>
         <span style="font-weight:700;color:#999;font-size:10px;white-space:nowrap;">${mes}</span></div>
       <div style="display:flex;gap:12px;">
-        ${tile(comprou, 'Comprou', '#16A34A', '#D9F5E3')}
+        ${tile(comprou, 'Comprou', '#16A34A', '#D9F5E3', R(vendido))}
         ${tile(naoComprou, 'Não comprou', '#DC2626', '#FDE2DF')}
       </div></div>`;
   }).join('');
