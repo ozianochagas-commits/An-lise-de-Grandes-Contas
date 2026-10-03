@@ -4241,7 +4241,7 @@ function refreshInativForRep(){
 }
 
 // Painel por representante: um painel por representante (Todos) ou só o escolhido.
-// Mostra, no mês selecionado, quantos grupos compraram (todas as filiais) e quantos não compraram (conta do cabeçalho do mês).
+// Mostra, no mês selecionado, quantos grupos compraram (qualquer filial) e quantos não compraram (conta do cabeçalho do mês).
 function renderInativRepPanel(escolhido){
   const box = $('inativ-rep-panel'); if(!box) return;
   const months = (INATIV_DATA && INATIV_DATA.months) || [];
@@ -4262,17 +4262,16 @@ function renderInativRepPanel(escolhido){
     const grupos = getFilteredInativGrupos(((INATIV_BY_REP[rep]||{}).grupos || []).filter(g => !grupoExcluido(g.nome)), mesIdx);
     // Mesma conta do número do cabeçalho do mês: grupo que não comprou conta 1;
     // grupo que comprou conta cada filial sem venda (não comprou) e cada filial que comprou (comprou).
-    // Comprou = grupos em que TODAS as filiais compraram no mês (as mesmas linhas que a tabela mostra
-    // ao filtrar "Comprou"); Não comprou = mesma conta do cabeçalho do mês (grupo sem compra conta 1;
-    // grupo que comprou conta cada filial sem venda).
+    // Comprou = grupos que tiveram compra no mês (mesmas linhas da tabela ao filtrar "Comprou");
+    // Não comprou = mesma conta do cabeçalho do mês (grupo sem compra conta 1; grupo que comprou
+    // conta cada filial sem venda).
     let naoComprou = 0, comprou = 0, vendido = 0;
     grupos.forEach(g => {
       const fil = g.filiais || [];
       const totalGrupo = fil.length ? fil.reduce((t,f) => t + ((f.vals && f.vals[mesIdx]) || 0), 0) : ((g.vals && g.vals[mesIdx]) || 0);
       if(totalGrupo === 0){ naoComprou++; return; }      // grupo inteiro sem compra → conta 1
-      const sem = fil.filter(f => !f.vals || f.vals[mesIdx] === 0).length;
-      naoComprou += sem;                                  // filiais que não compraram
-      if(sem === 0){ comprou++; vendido += totalGrupo; }  // grupo 100% comprou
+      comprou++; vendido += totalGrupo;                   // grupo comprou
+      naoComprou += fil.filter(f => !f.vals || f.vals[mesIdx] === 0).length;   // filiais sem venda
     });
     const nome = String(rep).replace(/&/g,'&amp;').replace(/</g,'&lt;');
     return `<div style="background:white;border-radius:12px;padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
@@ -4707,7 +4706,7 @@ function getFilteredInativGrupos(lista, ignorarCol){
     // Filtros por coluna (combinados com E) — precisa passar em TODOS
     for(let k=0; k<3; k++){
       if(colFilters[k] === 'nao' && !sem[k]) return false;   // quero "não comprou" mas comprou tudo
-      if(colFilters[k] === 'sim' && sem[k])  return false;   // quero "comprou" mas alguém não comprou
+      if(colFilters[k] === 'sim' && !gGrupoComprou(g, k)) return false;   // quero "comprou": o grupo teve compra no mês (qualquer filial)
     }
 
     // Filtro geral (dropdown de atalho)
@@ -4722,6 +4721,12 @@ function getFilteredInativGrupos(lista, ignorarCol){
   });
 }
 
+// true se o grupo teve compra no mês k (soma das filiais > 0)
+function gGrupoComprou(g, k){
+  const fil = g.filiais || [];
+  const t = fil.length ? fil.reduce((a,f) => a + ((f.vals && f.vals[k]) || 0), 0) : ((g.vals && g.vals[k]) || 0);
+  return t > 0;
+}
 // true se, no mês k, o grupo não comprou OU alguma filial não comprou
 function gGrupoTemSemVenda(g, k){
   if(g.vals[k] === 0) return true;
