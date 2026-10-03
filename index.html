@@ -1181,6 +1181,9 @@ try{
     background:#2a2a2a;color:#fff;cursor:pointer;outline:none;max-width:96px;}
   .col-filter:focus {border-color:var(--orange);}
   .col-filter option {background:#fff;color:#333;}
+  /* Link compartilhado: filtro de representante e "Ver representante" não aceitam clique */
+  body.share-lock .filter-dropdown, body.share-lock #inativ-rep-select {pointer-events:none;opacity:.85;}
+  body.share-lock #filter-menu {display:none !important;}
 </style>
 
 <div class="toolbar">
@@ -3536,6 +3539,7 @@ function buildFilter(){
 
 // Toggle dropdown menu
 function toggleFilterMenu(){
+  if(window.__linkCompartilhado) return;   // link compartilhado: filtro travado
   const menu = $('filter-menu');
   const btn = $('filter-btn');
   const isOpen = menu.style.display !== 'none';
@@ -3647,6 +3651,7 @@ function updateFilterText(){
 
 // Marca/desmarca todos os representantes
 function toggleAllCheckboxes(){
+  if(window.__linkCompartilhado) return;   // link compartilhado: filtro travado
   const allCheckbox = $('rep-all');
   const checkboxes = document.querySelectorAll('.rep-checkbox');
   checkboxes.forEach(cb => cb.checked = allCheckbox.checked);
@@ -4149,6 +4154,7 @@ function repBrandKey(name){
 }
 // Mudou o seletor "Ver representante" (aba) → espelha no filtro do topo e recalcula
 function onInativRepChange(){
+  if(window.__linkCompartilhado) return;   // link compartilhado: seletor travado
   if(!__syncingReps){
     __syncingReps = true;
     const rep = ($('inativ-rep-select')||{}).value || '';
@@ -7687,6 +7693,7 @@ function mostrarCarregandoLink(on){
 
 // Aplica o modo somente-visualização (link compartilhado)
 function aplicarModoVisualizacao(){
+  document.body.classList.add('share-lock');
   // Banner
   const banner = $('share-banner');
   if(banner){
