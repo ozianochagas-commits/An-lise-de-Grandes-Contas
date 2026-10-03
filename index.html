@@ -4249,12 +4249,17 @@ function renderInativRepPanel(escolhido){
   let reps = Object.keys(INATIV_BY_REP).filter(repNaRegiao).sort();
   if(escolhido) reps = reps.filter(r => r === escolhido);
   const mes = months[mesIdx] || '';
-  const tile = (num, label, cor, fundo, extra) => `<div style="flex:1;min-width:0;background:${fundo};border-left:4px solid ${cor};border-radius:10px;padding:12px 14px;text-align:center;">
+  const tile = (num, label, cor, fundo, extra, clk, ativo) => `<div ${clk ? `onclick="${clk}" title="Clique para filtrar a tabela"` : ''} style="${clk ? 'cursor:pointer;' : ''}${ativo ? `outline:3px solid ${cor};` : ''}flex:1;min-width:0;background:${fundo};border-left:4px solid ${cor};border-radius:10px;padding:12px 14px;text-align:center;">
       <div style="font-size:30px;font-weight:900;color:${cor};line-height:1.1;">${num}</div>
       <div style="font-size:10px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-top:4px;white-space:nowrap;">${label}</div>${extra ? `<div style="font-size:13px;font-weight:900;color:${cor};margin-top:6px;">${extra}</div>` : ''}</div>`;
-  box.innerHTML = reps.map(rep => {
+  window.__painelReps = reps;
+  const selAtual = ($('inativ-rep-select')||{}).value || '';
+  const colSel = document.querySelector(`.col-filter[data-col="${mesIdx}"]`);
+  const colVal = colSel ? colSel.value : '';
+  box.innerHTML = reps.map((rep, ri) => {
+    const ativo = t => selAtual === rep && colVal === t;
     // aplica a busca e os filtros da tabela (colunas de mês / atalho) aos grupos deste representante
-    const grupos = getFilteredInativGrupos(((INATIV_BY_REP[rep]||{}).grupos || []).filter(g => !grupoExcluido(g.nome)));
+    const grupos = getFilteredInativGrupos(((INATIV_BY_REP[rep]||{}).grupos || []).filter(g => !grupoExcluido(g.nome)), mesIdx);
     // Mesma conta do número do cabeçalho do mês: grupo que não comprou conta 1;
     // grupo que comprou conta cada filial sem venda (não comprou) e cada filial que comprou (comprou).
     let naoComprou = 0, comprou = 0, vendido = 0;
@@ -4274,10 +4279,26 @@ function renderInativRepPanel(escolhido){
         <span title="${nome}" style="font-size:12px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">👤 ${nome}</span>
         <span style="font-weight:700;color:#999;font-size:10px;white-space:nowrap;">${mes}</span></div>
       <div style="display:flex;gap:12px;">
-        ${tile(comprou, 'Comprou', '#16A34A', '#D9F5E3', R(vendido))}
-        ${tile(naoComprou, 'Não comprou', '#DC2626', '#FDE2DF')}
+        ${tile(comprou, 'Comprou', '#16A34A', '#D9F5E3', R(vendido), `filtrarInativPainel(${ri},'sim')`, ativo('sim'))}
+        ${tile(naoComprou, 'Não comprou', '#DC2626', '#FDE2DF', '', `filtrarInativPainel(${ri},'nao')`, ativo('nao'))}
       </div></div>`;
   }).join('');
+}
+
+// Clique num botão do painel: seleciona o representante e filtra a tabela (Comprou / Não comprou
+// no último mês). Clicar de novo no mesmo botão limpa o filtro e volta para "Todos".
+function filtrarInativPainel(i, tipo){
+  const rep = (window.__painelReps || [])[i]; if(rep === undefined) return;
+  const sel = $('inativ-rep-select'); if(!sel) return;
+  const col = document.querySelector(`.col-filter[data-col="${Math.max(0, (INATIV_DATA.months||[]).length - 1)}"]`);
+  if(!col) return;
+  if(sel.value === rep && col.value === tipo){
+    col.value = ''; sel.value = ''; onInativRepChange();
+  } else {
+    col.value = tipo;
+    if(sel.value !== rep){ sel.value = rep; onInativRepChange(); }
+  }
+  applyInativFilter();
 }
 
 // Combina TODOS os representantes: cada CliAgrup aparece uma vez, e cada filial
@@ -4659,7 +4680,7 @@ function autoSplitByRep(parsed){
 }
 
 // Retorna GRUPOS filtrados conforme busca, filtro geral e filtros por coluna
-function getFilteredInativGrupos(lista){
+function getFilteredInativGrupos(lista, ignorarCol){
   const semAcento = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const search = semAcento(($('inativ-search').value || '').trim());
   const monthsFilter = $('inativ-months-filter').value;
@@ -4669,6 +4690,7 @@ function getFilteredInativGrupos(lista){
   document.querySelectorAll('.col-filter').forEach(sel => {
     colFilters[parseInt(sel.dataset.col)] = sel.value || null;
   });
+  if(ignorarCol !== undefined && ignorarCol !== null) colFilters[ignorarCol] = null;
 
   return (lista || INATIV_DATA.grupos).filter(g => {
     // Busca por nome do grupo OU de qualquer filial
