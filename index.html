@@ -1182,7 +1182,7 @@ try{
   .col-filter:focus {border-color:var(--orange);}
   .col-filter option {background:#fff;color:#333;}
   /* Link compartilhado: filtro de representante e "Ver representante" não aceitam clique */
-  body.share-lock .filter-dropdown, body.share-lock #inativ-rep-select {pointer-events:none;opacity:.85;}
+  body.share-lock .filter-dropdown {pointer-events:none;opacity:.85;}
   body.share-lock #filter-menu {display:none !important;}
 </style>
 
@@ -4154,7 +4154,6 @@ function repBrandKey(name){
 }
 // Mudou o seletor "Ver representante" (aba) → espelha no filtro do topo e recalcula
 function onInativRepChange(){
-  if(window.__linkCompartilhado) return;   // link compartilhado: seletor travado
   if(!__syncingReps){
     __syncingReps = true;
     const rep = ($('inativ-rep-select')||{}).value || '';
@@ -7744,8 +7743,7 @@ function aplicarModoVisualizacao(){
     }
 
     // Link compartilhado (qualquer um): trava o filtro de representante do topo
-    // e o seletor "Ver representante" da aba — quem recebe fica só na seleção
-    // que estava ativa quando o link foi gerado.
+    // da aba — o seletor "Ver representante" continua livre.
     {
       document.querySelectorAll('.rep-checkbox').forEach(cb => { cb.disabled = true; });
       const repAll = $('rep-all'); if(repAll) repAll.disabled = true;
@@ -7757,10 +7755,8 @@ function aplicarModoVisualizacao(){
         filterBtn.style.opacity = '.85';
       }
       const menu = $('filter-menu'); if(menu) menu.style.display = 'none';
-      // trava o seletor "Ver representante" (aba Clientes Inativos) e esconde os botões da barra
+      // mantém o seletor "Ver representante" livre e esconde os botões da barra
       rebuildInativRepSelect();
-      const selRep = $('inativ-rep-select');
-      if(selRep){ selRep.disabled = true; selRep.style.cursor='not-allowed'; selRep.style.opacity='.85'; }
       document.querySelectorAll('#inativ-rep-bar .pdf-btn').forEach(b => b.style.display='none');
     }
   }
