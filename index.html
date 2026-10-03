@@ -1500,7 +1500,7 @@ try{
   </div>
 
   <!-- PAINEL POR REPRESENTANTE: "Todos" mostra um painel de cada; um representante mostra só o dele -->
-  <div id="inativ-rep-panel" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;"></div>
+  <div id="inativ-rep-panel" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:16px;"></div>
 
   <!-- ÁREA DE IMPORTAÇÃO -->
   <div id="inativ-import-area" style="background:white;border:3px dashed var(--orange);border-radius:12px;padding:36px 24px;text-align:center;margin-bottom:24px;box-shadow:0 2px 10px rgba(0,0,0,.06);">
@@ -4241,7 +4241,7 @@ function refreshInativForRep(){
 }
 
 // Painel por representante: um painel por representante (Todos) ou só o escolhido.
-// Mostra, no mês selecionado: grupos, filiais, sem venda e valor vendido.
+// Mostra, no mês selecionado, quantos grupos compraram e quantos não compraram.
 function renderInativRepPanel(escolhido){
   const box = $('inativ-rep-panel'); if(!box) return;
   const months = (INATIV_DATA && INATIV_DATA.months) || [];
@@ -4257,26 +4257,20 @@ function renderInativRepPanel(escolhido){
   }
   let reps = Object.keys(INATIV_BY_REP).filter(repNaRegiao).sort();
   if(escolhido) reps = reps.filter(r => r === escolhido);
-  const tile = (num, label, cor, fundo) => `<div style="flex:1 1 150px;background:${fundo};border-left:4px solid ${cor};border-radius:10px;padding:12px 16px;">
-      <div style="font-size:26px;font-weight:900;color:${cor};line-height:1.1;">${num}</div>
-      <div style="font-size:10px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;">${label}</div></div>`;
+  const mes = months[mesIdx] || '';
+  const tile = (num, label, cor, fundo) => `<div style="flex:1;min-width:0;background:${fundo};border-left:4px solid ${cor};border-radius:10px;padding:10px 14px;">
+      <div style="font-size:28px;font-weight:900;color:${cor};line-height:1.1;">${num}</div>
+      <div style="font-size:10px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:3px;">${label}</div></div>`;
   box.innerHTML = reps.map(rep => {
     const grupos = ((INATIV_BY_REP[rep]||{}).grupos || []).filter(g => !grupoExcluido(g.nome));
-    let semVenda = 0, vendido = 0, filiais = 0;
-    grupos.forEach(g => {
-      filiais += (g.filiais||[]).length;
-      vendido += (g.vals && g.vals[mesIdx]) || 0;
-      if(g.vals && g.vals[mesIdx] === 0) semVenda++; else semVenda += nFiliaisSemVenda(g, mesIdx);
-    });
+    const naoComprou = grupos.filter(g => g.vals && g.vals[mesIdx] === 0).length;
+    const comprou = grupos.length - naoComprou;
     const nome = String(rep).replace(/&/g,'&amp;').replace(/</g,'&lt;');
-    const mes = months[mesIdx] || '';
-    return `<div style="background:white;border-radius:12px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-      <div style="font-size:12px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">👤 ${nome}</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        ${tile(grupos.length, 'Grupos', '#FF5000', '#FFE9DC')}
-        ${tile(filiais, 'Filiais', '#6B7280', '#F1F1F1')}
-        ${tile(semVenda, 'Sem venda · ' + mes, '#DC2626', '#FDE2DF')}
-        ${tile(R(vendido), 'Vendido · ' + mes, '#16A34A', '#D9F5E3')}
+    return `<div style="background:white;border-radius:12px;padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+      <div style="font-size:12px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">👤 ${nome} <span style="font-weight:600;color:#888;font-size:10px;">· ${mes}</span></div>
+      <div style="display:flex;gap:10px;">
+        ${tile(comprou, 'Comprou', '#16A34A', '#D9F5E3')}
+        ${tile(naoComprou, 'Não comprou', '#DC2626', '#FDE2DF')}
       </div></div>`;
   }).join('');
 }
