@@ -4259,11 +4259,14 @@ function renderInativRepPanel(escolhido){
     // grupo que comprou conta cada filial sem venda (não comprou) e cada filial que comprou (comprou).
     let naoComprou = 0, comprou = 0, vendido = 0;
     grupos.forEach(g => {
-      vendido += (g.vals && g.vals[mesIdx]) || 0;
-      if(g.vals && g.vals[mesIdx] === 0){ naoComprou++; return; }
-      const sem = nFiliaisSemVenda(g, mesIdx);
-      naoComprou += sem;
-      comprou += (g.filiais || []).length - sem;
+      // soma pelas FILIAIS (o total do grupo pode estar desatualizado após ajustes de representante)
+      const fil = g.filiais || [];
+      const totalGrupo = fil.length ? fil.reduce((t,f) => t + ((f.vals && f.vals[mesIdx]) || 0), 0) : ((g.vals && g.vals[mesIdx]) || 0);
+      vendido += totalGrupo;
+      if(totalGrupo === 0){ naoComprou++; return; }      // grupo inteiro sem compra → conta 1
+      const sem = fil.filter(f => !f.vals || f.vals[mesIdx] === 0).length;
+      naoComprou += sem;                                  // filiais que não compraram
+      comprou += fil.length - sem;                        // filiais que compraram
     });
     const nome = String(rep).replace(/&/g,'&amp;').replace(/</g,'&lt;');
     return `<div style="background:white;border-radius:12px;padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
