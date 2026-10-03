@@ -7736,9 +7736,10 @@ function aplicarModoVisualizacao(){
       applyFilter();
     }
 
-    // Link de UM representante específico: trava o filtro pra quem recebe
-    // não conseguir marcar outro representante e ver dados que não são dele.
-    if(window.__lockSingleRep !== null && window.__lockSingleRep !== undefined){
+    // Link compartilhado (qualquer um): trava o filtro de representante do topo
+    // e o seletor "Ver representante" da aba — quem recebe fica só na seleção
+    // que estava ativa quando o link foi gerado.
+    {
       document.querySelectorAll('.rep-checkbox').forEach(cb => { cb.disabled = true; });
       const repAll = $('rep-all'); if(repAll) repAll.disabled = true;
       const filterBtn = $('filter-btn');
@@ -7749,6 +7750,11 @@ function aplicarModoVisualizacao(){
         filterBtn.style.opacity = '.85';
       }
       const menu = $('filter-menu'); if(menu) menu.style.display = 'none';
+      // trava o seletor "Ver representante" (aba Clientes Inativos) e esconde os botões da barra
+      rebuildInativRepSelect();
+      const selRep = $('inativ-rep-select');
+      if(selRep){ selRep.disabled = true; selRep.style.cursor='not-allowed'; selRep.style.opacity='.85'; }
+      document.querySelectorAll('#inativ-rep-bar .pdf-btn').forEach(b => b.style.display='none');
     }
   }
 
