@@ -4262,7 +4262,8 @@ function renderInativRepPanel(escolhido){
       <div style="font-size:30px;font-weight:900;color:${cor};line-height:1.1;">${num}</div>
       <div style="font-size:10px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-top:4px;white-space:nowrap;">${label}</div></div>`;
   box.innerHTML = reps.map(rep => {
-    const grupos = ((INATIV_BY_REP[rep]||{}).grupos || []).filter(g => !grupoExcluido(g.nome));
+    // aplica a busca e os filtros da tabela (colunas de mês / atalho) aos grupos deste representante
+    const grupos = getFilteredInativGrupos(((INATIV_BY_REP[rep]||{}).grupos || []).filter(g => !grupoExcluido(g.nome)));
     const naoComprou = grupos.filter(g => g.vals && g.vals[mesIdx] === 0).length;
     const comprou = grupos.length - naoComprou;
     const nome = String(rep).replace(/&/g,'&amp;').replace(/</g,'&lt;');
@@ -4656,7 +4657,7 @@ function autoSplitByRep(parsed){
 }
 
 // Retorna GRUPOS filtrados conforme busca, filtro geral e filtros por coluna
-function getFilteredInativGrupos(){
+function getFilteredInativGrupos(lista){
   const semAcento = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const search = semAcento(($('inativ-search').value || '').trim());
   const monthsFilter = $('inativ-months-filter').value;
@@ -4667,7 +4668,7 @@ function getFilteredInativGrupos(){
     colFilters[parseInt(sel.dataset.col)] = sel.value || null;
   });
 
-  return INATIV_DATA.grupos.filter(g => {
+  return (lista || INATIV_DATA.grupos).filter(g => {
     // Busca por nome do grupo OU de qualquer filial
     if(search){
       const noGrupo = semAcento(g.nome).includes(search);
@@ -4787,6 +4788,7 @@ function applyInativFilter(){
   const months = INATIV_DATA.months;
 
   const filtered = getFilteredInativGrupos();
+  try{ renderInativRepPanel(($('inativ-rep-select')||{}).value || ''); }catch(e){}   // painel acompanha os filtros
 
   // KPI: filiais sem venda no MÊS SELECIONADO (não sempre no último)
   // Se currentMonth está definido, encontrar seu índice nos meses importados
