@@ -4815,6 +4815,15 @@ function applyInativFilter(){
   const filtered = getFilteredInativGrupos();
   try{ renderInativRepPanel(($('inativ-rep-select')||{}).value || ''); }catch(e){}   // painel acompanha os filtros
 
+  // Número ao lado do mês: normalmente = sem venda; com "Comprou" marcado na coluna = nº de grupos que compraram (linhas da tabela)
+  try{
+    document.querySelectorAll('.col-filter').forEach(sel => {
+      const k = parseInt(sel.dataset.col), lb = $('lbl-m'+(k+1));
+      if(!lb || !months[k]) return;
+      lb.textContent = `${months[k]}\n(${sel.value === 'sim' ? filtered.length : contarNaoComprouGlobalSemFiltros(k)})`;
+    });
+  }catch(e){}
+
   // KPI: filiais sem venda no MÊS SELECIONADO (não sempre no último)
   // Se currentMonth está definido, encontrar seu índice nos meses importados
   let mesIdx = Math.max(0, INATIV_DATA.months.length - 1); // default: último mês
