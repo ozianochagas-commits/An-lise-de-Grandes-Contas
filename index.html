@@ -3937,6 +3937,22 @@ function contarNaoComprouGlobalSemFiltros(mesIdx){
   let count = 0;
   if(!INATIV_DATA || !INATIV_DATA.grupos) return 0;
 
+  // "Todos os Representantes": soma o que cada representante não comprou (mesma conta dos
+  // painéis por representante), em vez de juntar os grupos repetidos entre representantes.
+  const selRep = (typeof $ === 'function' && $('inativ-rep-select')) ? $('inativ-rep-select').value : '';
+  if(!selRep && typeof INATIV_BY_REP === 'object' && Object.keys(INATIV_BY_REP).length){
+    Object.keys(INATIV_BY_REP).filter(repNaRegiao).forEach(rep => {
+      ((INATIV_BY_REP[rep]||{}).grupos || []).forEach(g => {
+        if(grupoExcluido(g.nome)) return;
+        const fil = g.filiais || [];
+        const tot = fil.length ? fil.reduce((t,f) => t + ((f.vals && f.vals[mesIdx]) || 0), 0) : ((g.vals && g.vals[mesIdx]) || 0);
+        if(tot === 0) count++;
+        else count += fil.filter(f => !f.vals || f.vals[mesIdx] === 0).length;
+      });
+    });
+    return count;
+  }
+
   // Grupo que não comprou ("NÃO") conta 1; grupo que comprou mas tem filiais
   // sem venda ("⚠ 3 filiais s/ venda") conta cada uma dessas filiais.
   INATIV_DATA.grupos.forEach(grupo => {
