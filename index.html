@@ -1472,6 +1472,7 @@ try{
         <div><div style="font-size:8px;opacity:.65;text-transform:uppercase;letter-spacing:.5px;">Realizado</div><strong id="inativ-mes-real" style="font-size:15px;color:#fff;font-weight:900;">—</strong></div>
         <div><div style="font-size:8px;opacity:.65;text-transform:uppercase;letter-spacing:.5px;">% Atingido</div><strong id="inativ-mes-atp" style="font-size:15px;color:var(--orange2);font-weight:900;">—</strong></div>
         <div><div style="font-size:8px;opacity:.65;text-transform:uppercase;letter-spacing:.5px;">Carteira</div><strong id="inativ-mes-car" style="font-size:15px;color:#7CB342;font-weight:900;">—</strong></div>
+        <div><div style="font-size:8px;opacity:.65;text-transform:uppercase;letter-spacing:.5px;">Realizado + Carteira</div><strong id="inativ-mes-tot" style="font-size:15px;color:#FFD54F;font-weight:900;">—</strong></div>
       </div>
       <div style="border-top:1px solid rgba(255,255,255,.15);padding-top:8px;">
         <span>Grupos Sem Venda <span id="inativ-kpi-mes" style="color:var(--orange2);font-weight:900;"></span></span><strong id="inativ-total">—</strong>
@@ -3985,12 +3986,21 @@ function updateInativResultado(){
     sv('inativ-mes-real', window.__resMes.real || '—');
     sv('inativ-mes-atp',  window.__resMes.atp  || '—');
     sv('inativ-mes-car',  window.__resMes.car  || '—');
+    atualizarRealMaisCarteira();
     return;
   }
   const r = resultadoDoMes(key);
   sv('inativ-mes-real', r ? r.real : '—');
   sv('inativ-mes-atp',  r ? r.atp  : '—');
   sv('inativ-mes-car',  r ? r.car  : '—');
+  atualizarRealMaisCarteira();
+}
+
+// Realizado + Carteira (soma dos dois valores exibidos ao lado)
+function atualizarRealMaisCarteira(){
+  const num = id => { const e = document.getElementById(id); return e ? (parseFloat(String(e.textContent).replace(/[^\d,]/g,'').replace(',','.')) || 0) : 0; };
+  const real = num('inativ-mes-real'), car = num('inativ-mes-car');
+  sv('inativ-mes-tot', (real || car) ? R(real + car) : '—');
 }
 
 // (compat) mantém a chamada antiga apontando para a nova lógica
@@ -7873,6 +7883,7 @@ function aplicarModoVisualizacao(){
     set('inativ-mes-real', window.__resMes.real);
     set('inativ-mes-atp',  window.__resMes.atp);
     set('inativ-mes-car',  window.__resMes.car);
+    atualizarRealMaisCarteira();
   }
 }
 
