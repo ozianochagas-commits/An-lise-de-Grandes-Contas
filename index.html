@@ -1218,6 +1218,12 @@ try{
     }
     .htotal span, .htotal div, .phero p, .phero span{ opacity:1 !important; }
     body{ -webkit-font-smoothing:antialiased; text-rendering:geometricPrecision; }
+    /* painel por representante: 2 colunas para os números caberem dentro das caixas */
+    #inativ-rep-panel{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:10px !important; }
+    #inativ-rep-panel > div{ page-break-inside:avoid; overflow:hidden; }
+    .rp-tile{ min-width:0 !important; padding:10px 8px !important; overflow:hidden; }
+    .rp-num{ font-size:26px !important; }
+    .rp-val{ font-size:12px !important; }
   }
 </style>
 
@@ -4322,9 +4328,9 @@ function renderInativRepPanel(escolhido){
   let reps = Object.keys(INATIV_BY_REP).filter(repNaRegiao).sort();
   if(escolhido) reps = reps.filter(r => r === escolhido);
   const mes = months[mesIdx] || '';
-  const tile = (num, label, cor, fundo, extra, clk, ativo) => `<div ${clk ? `onclick="${clk}" title="Clique para filtrar a tabela"` : ''} style="${clk ? 'cursor:pointer;' : ''}${ativo ? `outline:3px solid ${cor};` : ''}flex:1;min-width:0;background:${fundo};border-left:4px solid ${cor};border-radius:10px;padding:12px 14px;text-align:center;">
-      <div style="font-size:30px;font-weight:900;color:${cor};line-height:1.1;">${num}</div>
-      <div style="font-size:10px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-top:4px;white-space:nowrap;">${label}</div>${extra ? `<div style="font-size:13px;font-weight:900;color:${cor};margin-top:6px;">${extra}</div>` : ''}</div>`;
+  const tile = (num, label, cor, fundo, extra, clk, ativo) => `<div ${clk ? `onclick="${clk}" title="Clique para filtrar a tabela"` : ''} class="rp-tile" style="${clk ? 'cursor:pointer;' : ''}${ativo ? `outline:3px solid ${cor};` : ''}flex:1;min-width:0;background:${fundo};border-left:4px solid ${cor};border-radius:10px;padding:12px 14px;text-align:center;">
+      <div class="rp-num" style="font-size:30px;font-weight:900;color:${cor};line-height:1.1;">${num}</div>
+      <div style="font-size:10px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-top:4px;white-space:nowrap;">${label}</div>${extra ? `<div class="rp-val" style="font-size:13px;font-weight:900;color:${cor};margin-top:6px;white-space:nowrap;">${extra}</div>` : ''}</div>`;
   window.__painelReps = reps;
   const selAtual = ($('inativ-rep-select')||{}).value || '';
   const colSel = document.querySelector(`.col-filter[data-col="${mesIdx}"]`);
