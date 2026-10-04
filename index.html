@@ -782,32 +782,57 @@
     if (!dmIds.length) return { cloud: false };
 
     try {
-      const { error: delError } = await window.supabaseClient
+      // 1) Lê o que já está salvo na nuvem. Se não conseguir ler, NÃO mexe em nada
+      //    (antes apagava primeiro e podia perder dados se algo desse errado depois).
+      const { data: antigos, error: selError } = await window.supabaseClient
         .from('clientes')
-        .delete()
+        .select('id,dados_mensais_id,nome_cliente,valor_realizado')
         .in('dados_mensais_id', dmIds);
-      if (delError) throw delError;
+      if (selError) throw selError;
+      const realNaNuvem = {};   // "dadosMensaisId|nome" → valor "Passou" já salvo
+      (antigos || []).forEach(o => { realNaNuvem[o.dados_mensais_id + '|' + o.nome_cliente] = Number(o.valor_realizado) || 0; });
+      const idsAntigos = (antigos || []).map(o => o.id);
+      const editados = window.__realEditado || new Set();
 
+      // 2) Monta a lista nova. PROTEÇÃO: um "Passou" que já estava salvo na nuvem
+      //    nunca é zerado por uma sincronização automática (ex.: tela que abriu
+      //    com dados desatualizados). Só muda se a pessoa editou esse cliente agora.
+      let protegidos = 0;
       const rows = [];
       BASE.forEach((rep, i) => {
         const repId = idsPorNome[rep.name];
         const dmId = repId !== undefined ? dadosMensaisIdPorRepId[repId] : undefined;
         if (!dmId) return;
         (CLIENTS[i] || []).forEach(c => {
+          let real = toNumber(c.real) || 0;
+          const salvo = realNaNuvem[dmId + '|' + c.name] || 0;
+          if (real === 0 && salvo > 0 && !editados.has(i + '|' + c.name)) {
+            real = salvo; c.real = salvo; protegidos++;
+          }
           rows.push({
             dados_mensais_id: dmId,
             representante_id: repId,
             nome_cliente: c.name,
             valor: toNumber(c.value),
-            valor_realizado: toNumber(c.real) || 0,
+            valor_realizado: real,
             status: c.selected ? 'confirmado' : 'pendente'
           });
         });
       });
+      if (protegidos) {
+        console.warn('🛡️ ' + protegidos + ' valor(es) "Passou" já salvos foram preservados (não zerados).');
+        try { saveClientsData(); } catch (e) {}
+      }
 
+      // 3) Grava a lista nova PRIMEIRO e só depois remove as linhas antigas:
+      //    se a gravação falhar, nada do que estava salvo é perdido.
       if (rows.length) {
         const { error: insError } = await window.supabaseClient.from('clientes').insert(rows);
         if (insError) throw insError;
+      }
+      if (idsAntigos.length) {
+        const { error: delError } = await window.supabaseClient.from('clientes').delete().in('id', idsAntigos);
+        if (delError) throw delError;
       }
       console.log('✅ Clientes do Cenário Comercial sincronizados com o Supabase');
       return { cloud: true };
@@ -2320,6 +2345,7 @@ function setClientReal(clientIdx, raw){
   const client = CLIENTS[currentModalRepIndex][clientIdx];
   if(!client) return;
   client.real = toNumber(raw);
+  (window.__realEditado = window.__realEditado || new Set()).add(currentModalRepIndex + '|' + client.name);   // edição feita pela pessoa: pode zerar
   saveClientsData();
   saveData();
   renderClientsList();
