@@ -4927,7 +4927,7 @@ function applyInativFilter(){
 
     // ── LINHA DO GRUPO (nível 1) ──
     html += `
-      <tr style="background:#FFF3EC;cursor:${clicavel?'pointer':'default'};border-top:2px solid var(--orange);" ${clicavel?`onclick="toggleInativRow('g','${gi}')"`:''}>
+      <tr style="background:#fff;cursor:${clicavel?'pointer':'default'};border-top:2px solid var(--orange);" ${clicavel?`onclick="toggleInativRow('g','${gi}')"`:''}>
         <td style="font-weight:800;color:var(--dark);font-size:12px;">
           ${clicavel?`<span id="arrow-g-${gi}" style="color:var(--orange);font-size:11px;margin-right:6px;">${autoExpand?'▼':'▶'}</span>`:'<span style="margin-right:18px;"></span>'}
           ${g.nome}
