@@ -4299,17 +4299,6 @@ function renderInativRepPanel(escolhido){
   const tile = (num, label, cor, fundo, extra, clk, ativo) => `<div ${clk ? `onclick="${clk}" title="Clique para filtrar a tabela"` : ''} style="${clk ? 'cursor:pointer;' : ''}${ativo ? `outline:3px solid ${cor};` : ''}flex:1;min-width:0;background:${fundo};border-left:4px solid ${cor};border-radius:10px;padding:12px 14px;text-align:center;">
       <div style="font-size:30px;font-weight:900;color:${cor};line-height:1.1;">${num}</div>
       <div style="font-size:10px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-top:4px;white-space:nowrap;">${label}</div>${extra ? `<div style="font-size:13px;font-weight:900;color:${cor};margin-top:6px;">${extra}</div>` : ''}</div>`;
-  // Total de cada grupo somando TODOS os representantes (mesma base do número do cabeçalho do mês):
-  // grupo sem compra em nenhum deles é contado uma única vez, no primeiro representante dele.
-  const totalGeral = {}, primeiroRep = {};
-  Object.keys(INATIV_BY_REP).filter(repNaRegiao).sort().forEach(r => {
-    ((INATIV_BY_REP[r]||{}).grupos || []).filter(g => !grupoExcluido(g.nome)).forEach(g => {
-      const fil = g.filiais || [];
-      const t = fil.length ? fil.reduce((x,f) => x + ((f.vals && f.vals[mesIdx]) || 0), 0) : ((g.vals && g.vals[mesIdx]) || 0);
-      totalGeral[g.nome] = (totalGeral[g.nome] || 0) + t;
-      if(primeiroRep[g.nome] === undefined) primeiroRep[g.nome] = r;
-    });
-  });
   window.__painelReps = reps;
   const selAtual = ($('inativ-rep-select')||{}).value || '';
   const colSel = document.querySelector(`.col-filter[data-col="${mesIdx}"]`);
@@ -4327,12 +4316,9 @@ function renderInativRepPanel(escolhido){
     grupos.forEach(g => {
       const fil = g.filiais || [];
       const totalGrupo = fil.length ? fil.reduce((t,f) => t + ((f.vals && f.vals[mesIdx]) || 0), 0) : ((g.vals && g.vals[mesIdx]) || 0);
-      if(totalGeral[g.nome] === 0){                       // grupo que NÃO comprou em nenhum representante
-        if(primeiroRep[g.nome] === rep) naoComprou++;     // conta 1 vez só (no 1º representante dele)
-        return;
-      }
-      if(totalGrupo > 0){ comprou++; vendido += totalGrupo; }                   // grupo comprou
-      naoComprou += fil.filter(f => !f.vals || f.vals[mesIdx] === 0).length;    // só as filiais que faltaram
+      if(totalGrupo === 0){ naoComprou++; return; }      // grupo inteiro sem compra → conta 1
+      comprou++; vendido += totalGrupo;                   // grupo comprou
+      naoComprou += fil.filter(f => !f.vals || f.vals[mesIdx] === 0).length;   // filiais sem venda
     });
     const nome = String(rep).replace(/&/g,'&amp;').replace(/</g,'&lt;');
     return `<div style="background:white;border-radius:12px;padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
