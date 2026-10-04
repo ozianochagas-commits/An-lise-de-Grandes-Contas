@@ -1468,11 +1468,13 @@ try{
     </div>
     <div class="htotal" style="text-align:right;">
       <div style="font-size:15px;font-weight:900;letter-spacing:1.2px;color:#fff;text-transform:uppercase;margin-bottom:10px;">📊 Resultado de <span id="inativ-mes-nome" style="color:rgb(254,80,0);">—</span> <span style="font-size:11px;font-weight:700;color:rgba(255,255,255,.7);">(Dashboard)</span></div>
-      <div style="display:flex;gap:18px;justify-content:flex-end;margin-bottom:10px;">
+      <div style="display:flex;gap:18px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:10px;">
+        <div><div style="font-size:10px;font-weight:700;opacity:.8;text-transform:uppercase;letter-spacing:.5px;">Meta</div><strong id="inativ-mes-meta" style="font-size:15px;color:#fff;font-weight:900;">—</strong></div>
         <div><div style="font-size:10px;font-weight:700;opacity:.8;text-transform:uppercase;letter-spacing:.5px;">Realizado</div><strong id="inativ-mes-real" style="font-size:15px;color:#fff;font-weight:900;">—</strong></div>
         <div><div style="font-size:10px;font-weight:700;opacity:.8;text-transform:uppercase;letter-spacing:.5px;">% Atingido</div><strong id="inativ-mes-atp" style="font-size:15px;color:var(--orange2);font-weight:900;">—</strong></div>
         <div><div style="font-size:10px;font-weight:700;opacity:.8;text-transform:uppercase;letter-spacing:.5px;">Carteira</div><strong id="inativ-mes-car" style="font-size:15px;color:#7CB342;font-weight:900;">—</strong></div>
         <div><div style="font-size:10px;font-weight:700;opacity:.8;text-transform:uppercase;letter-spacing:.5px;">Realizado + Carteira</div><strong id="inativ-mes-tot" style="font-size:15px;color:#FFD54F;font-weight:900;">—</strong></div>
+        <div><div style="font-size:10px;font-weight:700;opacity:.8;text-transform:uppercase;letter-spacing:.5px;">% c/ Carteira</div><strong id="inativ-mes-atp2" style="font-size:15px;color:#FFD54F;font-weight:900;">—</strong></div>
       </div>
       <div style="border-top:1px solid rgba(255,255,255,.15);padding-top:8px;">
         <span>Grupos Sem Venda <span id="inativ-kpi-mes" style="color:var(--orange2);font-weight:900;"></span></span><strong id="inativ-total">—</strong>
@@ -3899,7 +3901,7 @@ function resultadoDoMes(monthKey){
       if(idxs && idxs.indexOf(i) < 0) return;   // fora da seleção → ignora
       tM += num(d.meta); tR += num(d.real); tC += num(d.car);
     });
-    return { real: R(tR), atp: P(tM>0 ? tR/tM : 0), car: R(tC) };
+    return { real: R(tR), atp: P(tM>0 ? tR/tM : 0), car: R(tC), meta: R(tM) };
   }catch(e){ return null; }
 }
 
@@ -3986,6 +3988,7 @@ function updateInativResultado(){
     sv('inativ-mes-real', window.__resMes.real || '—');
     sv('inativ-mes-atp',  window.__resMes.atp  || '—');
     sv('inativ-mes-car',  window.__resMes.car  || '—');
+    sv('inativ-mes-meta', window.__resMes.meta || '—');
     atualizarRealMaisCarteira();
     return;
   }
@@ -3993,6 +3996,7 @@ function updateInativResultado(){
   sv('inativ-mes-real', r ? r.real : '—');
   sv('inativ-mes-atp',  r ? r.atp  : '—');
   sv('inativ-mes-car',  r ? r.car  : '—');
+  sv('inativ-mes-meta', r ? r.meta : '—');
   atualizarRealMaisCarteira();
 }
 
@@ -4000,7 +4004,14 @@ function updateInativResultado(){
 function atualizarRealMaisCarteira(){
   const num = id => { const e = document.getElementById(id); return e ? (parseFloat(String(e.textContent).replace(/[^\d,]/g,'').replace(',','.')) || 0) : 0; };
   const real = num('inativ-mes-real'), car = num('inativ-mes-car');
+  let meta = num('inativ-mes-meta');
+  if(!meta){   // links antigos não trazem a meta: deduz do % atingido
+    const e = document.getElementById('inativ-mes-atp');
+    const atp = e ? (parseFloat(String(e.textContent).replace('%','').replace(',','.')) || 0) : 0;   // ex.: "94.4%"
+    if(real && atp){ meta = real / (atp / 100); sv('inativ-mes-meta', R(meta)); }
+  }
   sv('inativ-mes-tot', (real || car) ? R(real + car) : '—');
+  sv('inativ-mes-atp2', (meta && (real || car)) ? P((real + car) / meta) : '—');
 }
 
 // (compat) mantém a chamada antiga apontando para a nova lógica
@@ -7620,7 +7631,7 @@ function gerarLinkPorRep(){
   const meses = (dados.months || []);
   const ult = meses[meses.length-1] || '';
   const mKey = (function(){ const m=String(ult).toLowerCase().match(/([a-zç]{3})[a-zç]*\.?\/?\s*(\d{2,4})/); if(!m) return currentMonth; const map={jan:'01',fev:'02',mar:'03',abr:'04',mai:'05',jun:'06',jul:'07',ago:'08',set:'09',out:'10',nov:'11',dez:'12'}; const mm=map[m[1]]; if(!mm) return currentMonth; let yy=m[2]; if(yy.length===2) yy='20'+yy; return yy+'-'+mm; })();
-  const rMes = resultadoDoMes(mKey) || { real: txt('inativ-mes-real'), atp: txt('inativ-mes-atp'), car: txt('inativ-mes-car') };
+  const rMes = resultadoDoMes(mKey) || { real: txt('inativ-mes-real'), atp: txt('inativ-mes-atp'), car: txt('inativ-mes-car'), meta: txt('inativ-mes-meta') };
   const payload = {
     v: 1, ts: Date.now(),
     inativByRep: { [rep]: dados },
@@ -7883,6 +7894,7 @@ function aplicarModoVisualizacao(){
     set('inativ-mes-real', window.__resMes.real);
     set('inativ-mes-atp',  window.__resMes.atp);
     set('inativ-mes-car',  window.__resMes.car);
+    set('inativ-mes-meta', window.__resMes.meta);
     atualizarRealMaisCarteira();
   }
 }
