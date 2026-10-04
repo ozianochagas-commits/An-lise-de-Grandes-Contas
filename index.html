@@ -7629,6 +7629,13 @@ async function empacotarLink(payload, repLabel){
   }catch(e){ alert('Erro ao gerar o link.'); }
 }
 
+// Filtros da tabela de Clientes Inativos (colunas de mês, atalho e busca) — vão junto no link compartilhado
+function lerFiltrosInativ(){
+  const cols = ['','',''];
+  document.querySelectorAll('.col-filter').forEach(sel => { const k = parseInt(sel.dataset.col); if(k>=0 && k<3) cols[k] = sel.value || ''; });
+  return { cols: cols, mes: ($('inativ-months-filter')||{}).value || '', busca: ($('inativ-search')||{}).value || '' };
+}
+
 // Gera o link do que está sendo visto AGORA: a aba aberta e os
 // representantes marcados no filtro do topo — funciona em qualquer
 // aba (Dashboard, Editar Dados, Trimestre, etc.), pois o filtro e o
@@ -7671,7 +7678,8 @@ function gerarLinkCompartilhar(){
     selectedReps: allSelected ? null : selectedReps,
     // Link de UM representante específico: trava o filtro pra quem recebe
     // não conseguir marcar outros representantes e ver dados que não são dele.
-    lockSingleRep: (!allSelected && selectedReps.length === 1) ? selectedReps[0] : null
+    lockSingleRep: (!allSelected && selectedReps.length === 1) ? selectedReps[0] : null,
+    inativFiltros: lerFiltrosInativ()
   };
   mostrarLinkGerando();
   empacotarLink(payload, repLabel);
@@ -7699,7 +7707,8 @@ function gerarLinkPorRep(){
     lockRep: rep, onlyInativ: true,
     month: mKey,
     mesNome: monthFullName(mKey) || '',
-    resMes: rMes
+    resMes: rMes,
+    inativFiltros: lerFiltrosInativ()
   };
   // Agora tenta TinyURL para encurtar e passar no WhatsApp, com fallback para link longo embutido
   mostrarLinkGerando();
@@ -7781,6 +7790,7 @@ function aplicarPayload(payload){
   window.__resMes = payload.resMes || null;        // Resultado do Mês (Realizado / % / Carteira)
   window.__sharedActiveTab = payload.activeTab || null;       // aba em que o link foi gerado
   window.__sharedSelectedReps = payload.selectedReps || null; // representantes marcados no filtro
+  window.__sharedInativFiltros = payload.inativFiltros || null; // seleção feita na tabela (Não comprou / Comprou, busca)
   window.__lockSingleRep = (payload.lockSingleRep !== undefined && payload.lockSingleRep !== null)
     ? payload.lockSingleRep : null;                            // link de 1 representante só: trava o filtro
   return true;
@@ -7936,6 +7946,15 @@ function aplicarModoVisualizacao(){
 
   // Renderiza a análise de inatividade do representante atual (se houver)
   refreshInativForRep();
+
+  // Repõe a seleção que a pessoa fez na tabela antes de gerar o link (ex.: SET./26 = "Não comprou")
+  if(window.__sharedInativFiltros){
+    const f = window.__sharedInativFiltros;
+    document.querySelectorAll('.col-filter').forEach(sel => { const k = parseInt(sel.dataset.col); sel.value = (f.cols && f.cols[k]) || ''; });
+    const mf = $('inativ-months-filter'); if(mf && f.mes !== undefined) mf.value = f.mes || '';
+    const bs = $('inativ-search'); if(bs) bs.value = f.busca || '';
+    applyInativFilter();
+  }
 
   // Aplica o MÊS escolhido e o "Resultado do Mês" que vieram no link
   // (depois do recalc, para não serem sobrescritos pelos valores padrão).
