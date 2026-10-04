@@ -1209,6 +1209,16 @@ try{
   /* Link compartilhado: filtro de representante e "Ver representante" não aceitam clique */
   body.share-lock .filter-dropdown {pointer-events:none;opacity:.85;}
   body.share-lock #filter-menu {display:none !important;}
+  /* PDF nítido: sombras, desfoques e transparências viram imagem borrada no PDF; no papel ficam sólidos */
+  @media print{
+    *, *::before, *::after{
+      box-shadow:none !important; text-shadow:none !important;
+      filter:none !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+      transition:none !important; animation:none !important;
+    }
+    .htotal span, .htotal div, .phero p, .phero span{ opacity:1 !important; }
+    body{ -webkit-font-smoothing:antialiased; text-rendering:geometricPrecision; }
+  }
 </style>
 
 <div class="toolbar">
