@@ -8114,7 +8114,6 @@ function saveData(){
   try{
     const key = getStoreKey();
     localStorage.setItem(key, JSON.stringify(data));
-    showNotification(`💾 Dados salvos!`);
   }catch(e){
     showNotification(`❌ Erro ao salvar!`);
   }
