@@ -1694,6 +1694,8 @@ try{
           </div>
         </div>
 
+        <div id="plano-cliente-resumo" style="display:none;background:#FFF8F5;border:2px solid var(--orange);border-radius:8px;padding:12px 16px;margin-bottom:16px;"></div>
+
         <div class="stitle" style="border-radius:8px 8px 0 0;">📋 &nbsp;Dados de Plano de Negócio</div>
         <div class="twrap" style="overflow-x:auto;">
           <table>
@@ -7108,9 +7110,21 @@ function applyPlanoFilter(){
     reps.forEach(rep => (PLANO_BY_REP[rep] || []).forEach(plano => {
       if (planoNoPeriodoFiltro(plano, selectedTrimestre)) todosDados.push({ representante: rep, ...plano });
     }));
-    renderPlanoTable(filteredData, todosDados);
+    const t = renderPlanoTable(filteredData, todosDados);
+    const box = $('plano-cliente-resumo');
+    if (box) {
+      const nomes = Array.from(new Set(filteredData.flatMap(pl => (pl.grupos || []).map(g => g.nome)))).filter(Boolean);
+      const cel = (rot, val, cor) => `<div><div style="font-size:9px;color:#999;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">${rot}</div><div style="font-size:16px;font-weight:900;color:${cor};">${val}</div></div>`;
+      box.innerHTML = filteredData.length
+        ? `<div style="font-size:11px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🔎 Cliente: ${nomes.length === 1 ? nomes[0] : nomes.length + ' grupos encontrados'}</div>
+           <div style="display:flex;gap:28px;flex-wrap:wrap;">${cel('Total R$', formatMoney(t.faturado), 'var(--orange)')}${cel('Objetivo R$', formatMoney(t.objetivo), 'var(--dark)')}${cel('Falta R$', formatMoney(t.falta), 'var(--dark)')}${cel('Resultado', (t.pct * 100).toFixed(1) + '%', 'var(--orange)')}</div>`
+        : '<div style="font-size:12px;font-weight:700;color:#999;">Nenhum cliente encontrado.</div>';
+      box.style.display = 'block';
+    }
   } else {
     renderPlanoTable(filteredData);
+    const box = $('plano-cliente-resumo');
+    if (box) box.style.display = 'none';
   }
   atualizarBotoesExcluirRep();
 }
@@ -7498,10 +7512,12 @@ function renderPlanoTable(dados, dadosTotais){
     }
   }
 
+  const totaisFiltrados = { faturado: totalFaturado, objetivo: totalObjetivo, falta: totalFalta, pct: resultadoPctTotal, planos: qtdPlanos, batidos: qtdBatidos };
   if (totaisCheios) {
     if (tbody.lastElementChild) tbody.lastElementChild.innerHTML = totaisCheios.linha;
     totaisCheios.textos.forEach(([id, txt]) => { if (txt !== null && $(id)) $(id).textContent = txt; });
   }
+  return totaisFiltrados;
 }
 
 // Monta a URL curta do Plano de Negócio (?view=plano&rep=...&ro=1) a partir
