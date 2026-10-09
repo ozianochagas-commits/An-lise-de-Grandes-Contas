@@ -7105,12 +7105,7 @@ function applyPlanoFilter(){
   }
 
   if (termoCliente) {
-    const todosDados = [];
-    const reps = selectedRep ? [selectedRep] : Object.keys(PLANO_BY_REP).filter(repNaRegiao);
-    reps.forEach(rep => (PLANO_BY_REP[rep] || []).forEach(plano => {
-      if (planoNoPeriodoFiltro(plano, selectedTrimestre)) todosDados.push({ representante: rep, ...plano });
-    }));
-    const t = renderPlanoTable(filteredData, todosDados);
+    const t = renderPlanoTable(filteredData);
     const box = $('plano-cliente-resumo');
     if (box) {
       const nomes = Array.from(new Set(filteredData.flatMap(pl => (pl.grupos || []).map(g => g.nome)))).filter(Boolean);
