@@ -7102,7 +7102,16 @@ function applyPlanoFilter(){
     }
   }
 
-  renderPlanoTable(filteredData);
+  if (termoCliente) {
+    const todosDados = [];
+    const reps = selectedRep ? [selectedRep] : Object.keys(PLANO_BY_REP).filter(repNaRegiao);
+    reps.forEach(rep => (PLANO_BY_REP[rep] || []).forEach(plano => {
+      if (planoNoPeriodoFiltro(plano, selectedTrimestre)) todosDados.push({ representante: rep, ...plano });
+    }));
+    renderPlanoTable(filteredData, todosDados);
+  } else {
+    renderPlanoTable(filteredData);
+  }
   atualizarBotoesExcluirRep();
 }
 
@@ -7111,9 +7120,24 @@ function formatMoney(value) {
   return 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function renderPlanoTable(dados){
+// dadosTotais (opcional): dados sem o filtro de cliente. Quando informado, a
+// linha TOTAL GERAL e os painéis de totais mostram o valor cheio, enquanto a
+// tabela lista só as linhas filtradas.
+function renderPlanoTable(dados, dadosTotais){
   const tbody = $('plano-tbody');
   if (!tbody) return;
+
+  let totaisCheios = null;
+  if (dadosTotais) {
+    renderPlanoTable(dadosTotais);
+    const ids = ['plano-htotal-faturado','plano-htotal-objetivo','plano-htotal-falta','plano-htotal-pct',
+      'plano-total-faturado','plano-total-objetivo','plano-total-falta','plano-total-pct',
+      'plano-qtd-planos','plano-qtd-batidos','plano-qtd-batidos-pct'];
+    totaisCheios = {
+      linha: tbody.lastElementChild ? tbody.lastElementChild.innerHTML : '',
+      textos: ids.map(id => [id, $(id) ? $(id).textContent : null])
+    };
+  }
 
   tbody.innerHTML = '';
 
@@ -7472,6 +7496,11 @@ function renderPlanoTable(dados){
       outrasRegioesLista.innerHTML = '';
       outrasRegioesBox.style.display = 'none';
     }
+  }
+
+  if (totaisCheios) {
+    if (tbody.lastElementChild) tbody.lastElementChild.innerHTML = totaisCheios.linha;
+    totaisCheios.textos.forEach(([id, txt]) => { if (txt !== null && $(id)) $(id).textContent = txt; });
   }
 }
 
