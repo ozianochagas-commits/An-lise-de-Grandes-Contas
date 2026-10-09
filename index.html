@@ -7067,7 +7067,7 @@ function applyPlanoFilter(){
   // Mantém só os grupos cujo nome/código (ou o de alguma filial) contém o termo digitado
   const filtraCliente = plano => {
     if (!termoCliente) return plano;
-    const bate = o => o && (normalizePlanoText(o.nome || o.cliente).includes(termoCliente) || String(o.codCli ?? '').toLowerCase().includes(termoCliente));
+    const bate = o => o && (normalizePlanoText(o.nome || o.cliente).includes(termoCliente) || normalizePlanoText(o.codCli).includes(termoCliente));
     const grupos = (plano.grupos || []).filter(g => bate(g) || (g.clientes || []).some(bate));
     return grupos.length ? { ...plano, grupos } : null;
   };
