@@ -1681,6 +1681,10 @@ try{
               <option value="S2">2º Semestre</option>
             </select>
           </div>
+          <div style="flex:1;min-width:220px;">
+            <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">👤 Buscar cliente:</label>
+            <input type="text" id="plano-cliente-filter" oninput="applyPlanoFilter()" placeholder="Digite o nome ou código do cliente..." autocomplete="off" style="width:100%;margin-top:6px;padding:8px 12px;border:2px solid #E0E0E0;border-radius:7px;font-size:11px;font-weight:600;outline:none;box-sizing:border-box;">
+          </div>
           <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
             <button class="pdf-btn" onclick="exportPlanoPDF()" style="margin:0;">
               <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 4h5v7h7v9H6V4z"/></svg>
@@ -7059,16 +7063,26 @@ function applyPlanoFilter(){
   const selectedRep = repSelect ? repSelect.value : '';
   const selectedTrimestre = trimestreFilter ? trimestreFilter.value : '';
 
+  const termoCliente = normalizePlanoText($('plano-cliente-filter')?.value || '');
+  // Mantém só os grupos cujo nome/código (ou o de alguma filial) contém o termo digitado
+  const filtraCliente = plano => {
+    if (!termoCliente) return plano;
+    const bate = o => o && (normalizePlanoText(o.nome || o.cliente).includes(termoCliente) || String(o.codCli ?? '').toLowerCase().includes(termoCliente));
+    const grupos = (plano.grupos || []).filter(g => bate(g) || (g.clientes || []).some(bate));
+    return grupos.length ? { ...plano, grupos } : null;
+  };
+
   let filteredData = [];
 
   if (!selectedRep) {
     // Mostrar tudo (da região)
     Object.keys(PLANO_BY_REP).filter(repNaRegiao).forEach(rep => {
       PLANO_BY_REP[rep].forEach(plano => {
-        if (planoNoPeriodoFiltro(plano, selectedTrimestre)) {
+        const p = planoNoPeriodoFiltro(plano, selectedTrimestre) && filtraCliente(plano);
+        if (p) {
           filteredData.push({
             representante: rep,
-            ...plano
+            ...p
           });
         }
       });
@@ -7077,10 +7091,11 @@ function applyPlanoFilter(){
     // Mostrar só o representante selecionado
     if (PLANO_BY_REP[selectedRep]) {
       PLANO_BY_REP[selectedRep].forEach(plano => {
-        if (planoNoPeriodoFiltro(plano, selectedTrimestre)) {
+        const p = planoNoPeriodoFiltro(plano, selectedTrimestre) && filtraCliente(plano);
+        if (p) {
           filteredData.push({
             representante: selectedRep,
-            ...plano
+            ...p
           });
         }
       });
