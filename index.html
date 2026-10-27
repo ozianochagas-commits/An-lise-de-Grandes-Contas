@@ -2933,20 +2933,29 @@ function showClientTooltip(repIdx, event){
   if(selectedClients.length === 0){
     tooltip.innerHTML = '<div style="padding:20px;color:#999;font-size:9px;text-align:center;height:400px;display:flex;align-items:center;justify-content:center;">Nenhum cliente selecionado</div>';
   } else {
-    let html = '<div style="border-bottom:2px solid #ddd;padding:12px;margin-bottom:12px;font-weight:900;color:var(--orange);font-size:11px;background:#fff;">Clientes do Cenário Comercial:</div>';
-    let total = 0;
+    let html = '<div style="border-bottom:2px solid #ddd;padding:12px;margin-bottom:0;font-weight:900;color:var(--orange);font-size:11px;background:#fff;">Clientes do Cenário Comercial:</div>';
+    // cabeçalho das colunas: Cenário (previsto) e Passou (o que já passou)
+    html += `<div style="padding:6px 12px;display:flex;align-items:center;gap:6px;background:#fff;border-bottom:1px solid #eee;font-size:8px;font-weight:900;color:#888;letter-spacing:.4px;text-transform:uppercase;">
+        <span style="flex:1;">Cliente</span>
+        <span style="width:74px;text-align:right;">Cenário</span>
+        <span style="width:74px;text-align:right;">Passou</span>
+      </div>`;
+    let total = 0, totalPassou = 0;
     selectedClients.forEach(c => {
       let value = toNumber(c.value);
+      let passou = toNumber(c.real);
       total += value;
+      totalPassou += passou;
       html += `<div style="padding:12px;display:flex;align-items:center;gap:6px;justify-content:space-between;border-bottom:1px solid #f0f0f0;background:#fafafa;">
         <div style="display:flex;align-items:center;gap:4px;flex:1;">
           <div style="width:16px;height:16px;background:var(--orange);border-radius:2px;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:9px;">✓</div>
           <span style="font-weight:500;font-size:10px;">${c.name}</span>
         </div>
-        <span style="color:var(--orange);font-weight:900;white-space:nowrap;font-size:9px;">${fmtN(value)}</span>
+        <span style="width:74px;text-align:right;color:var(--orange);font-weight:900;white-space:nowrap;font-size:9px;">${fmtN(value)}</span>
+        <span style="width:74px;text-align:right;color:${passou>0?'#1a8f4d':'#bbb'};font-weight:900;white-space:nowrap;font-size:9px;">${passou>0?fmtN(passou):'—'}</span>
       </div>`;
     });
-    html += `<div style="padding:16px 12px;margin-top:12px;border-top:3px solid var(--orange);color:var(--orange);font-weight:900;display:flex;justify-content:space-between;font-size:11px;background:#fff;"><span>Total Geral:</span><span>${R(total)}</span></div>`;
+    html += `<div style="padding:16px 12px;margin-top:12px;border-top:3px solid var(--orange);color:var(--orange);font-weight:900;display:flex;justify-content:space-between;gap:6px;font-size:11px;background:#fff;"><span style="flex:1;">Total Geral:</span><span style="width:74px;text-align:right;white-space:nowrap;">${fmtN(total)}</span><span style="width:74px;text-align:right;white-space:nowrap;color:#1a8f4d;">${fmtN(totalPassou)}</span></div>`;
     html += '<div style="height:80px;background:#fff;"></div>';
     tooltip.innerHTML = html;
   }
