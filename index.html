@@ -4148,6 +4148,7 @@ function loadInativByRep(){
     }
   }catch(e){ INATIV_BY_REP = {}; }
   applyGroupOverrides();   // corrige grupos com ajuste manual mesmo em dados já salvos
+  applyGroupMerges();      // soma códigos duplicados do mesmo cliente (ex.: Bezerra & Oliveira 9287 → 377)
   applyFilialOverrides();  // corrige filiais individuais com ajuste manual
 }
 
@@ -4181,6 +4182,57 @@ function applyGroupOverrides(){
     });
   });
   // 3) remove representantes que ficaram sem nenhum grupo
+  Object.keys(INATIV_BY_REP).forEach(rep => { if(!(INATIV_BY_REP[rep].grupos || []).length) delete INATIV_BY_REP[rep]; });
+}
+
+// Fusão de códigos de grupo: clientes que aparecem com mais de um código são somados no código principal.
+// { marca: trecho do nome, de: código que some, para: código que fica }
+const GRUPOS_FUNDIR = [
+  { marca:'BEZERRA & OLIVEIRA', de:'(9287)', para:'(377)' }
+];
+function applyGroupMerges(){
+  if(!INATIV_BY_REP || !Object.keys(INATIV_BY_REP).length) return;
+  const norm = x => String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+  const mesclaFamilias = (dest, orig) => {
+    (orig || []).forEach(fo => {
+      const fd = dest.find(x => norm(x.nome) === norm(fo.nome));
+      if(fd){ for(let k=0;k<3;k++) fd.vals[k] = (fd.vals[k]||0) + ((fo.vals && fo.vals[k])||0); }
+      else dest.push({nome: fo.nome, vals: (fo.vals||[0,0,0]).slice()});
+    });
+  };
+  GRUPOS_FUNDIR.forEach(r => {
+    // acha o grupo principal (código "para") e o que deve sumir (código "de"), em qualquer representante
+    let principal = null, repPrincipal = null; const outros = [];
+    Object.keys(INATIV_BY_REP).forEach(rep => {
+      (INATIV_BY_REP[rep].grupos || []).forEach(g => {
+        const n = String(g.nome||'');
+        if(norm(n).indexOf(norm(r.marca)) < 0) return;
+        if(n.indexOf(r.para) >= 0){ if(!principal){ principal = g; repPrincipal = rep; } }
+        else if(n.indexOf(r.de) >= 0) outros.push({g, rep});
+      });
+    });
+    outros.forEach(({g, rep}) => {
+      if(!principal){   // não existe o código principal: só renomeia o grupo
+        g.nome = String(g.nome).replace(r.de, r.para); principal = g; repPrincipal = rep; return;
+      }
+      // soma as filiais no grupo principal (mesma filial → soma valores e famílias)
+      (g.filiais || []).forEach(fo => {
+        const fd = (principal.filiais = principal.filiais || []).find(x => norm(x.nome) === norm(fo.nome) && norm(x.uf) === norm(fo.uf));
+        if(fd){
+          fd.vals = (fd.vals || [0,0,0]).slice();
+          for(let k=0;k<3;k++) fd.vals[k] += ((fo.vals && fo.vals[k])||0);
+          fd.familias = fd.familias || [];
+          mesclaFamilias(fd.familias, fo.familias);
+        } else {
+          principal.filiais.push({nome: fo.nome, vals: (fo.vals||[0,0,0]).slice(), familias: (fo.familias||[]).map(f => ({nome:f.nome, vals:(f.vals||[0,0,0]).slice()})), uf: fo.uf, rep: fo.rep});
+        }
+      });
+      principal.vals = [0,0,0];
+      (principal.filiais || []).forEach(f => { for(let k=0;k<3;k++) principal.vals[k] += (f.vals[k]||0); });
+      // retira o grupo absorvido
+      INATIV_BY_REP[rep].grupos = (INATIV_BY_REP[rep].grupos || []).filter(x => x !== g);
+    });
+  });
   Object.keys(INATIV_BY_REP).forEach(rep => { if(!(INATIV_BY_REP[rep].grupos || []).length) delete INATIV_BY_REP[rep]; });
 }
 
@@ -4478,6 +4530,7 @@ async function importInativExcel(event){
 
     if(detectouRep){
       applyGroupOverrides();   // garante grupos com ajuste manual no rep certo
+      applyGroupMerges();
       applyFilialOverrides();  // garante filiais com ajuste manual no rep certo
       saveInativByRep();
       statusEl.textContent = '';
@@ -7844,7 +7897,7 @@ function aplicarPayload(payload){
     Object.keys(payload.ls).forEach(k => { try{ localStorage.setItem(k, payload.ls[k]); }catch(e){} });
   }
   if(payload.month) currentMonth = payload.month;
-  if(payload.inativByRep) INATIV_BY_REP = payload.inativByRep;
+  if(payload.inativByRep){ INATIV_BY_REP = payload.inativByRep; try{ applyGroupMerges(); }catch(e){} }
   else if(payload.inativ) INATIV_BY_REP = {}; // compat versão antiga
   window.__sharedView = true;
   window.__sharedTs = payload.ts || null;
