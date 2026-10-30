@@ -135,8 +135,8 @@ function montarNav(){ $('n-pecas').style.display=usuario==='Samuel'?'':'none'; }
 let visitas=lsGet(CH_VIS,[]), viagens=lsGet(CH_VIA,[]);
 const gravaV=()=>lsSet(CH_VIS,visitas), gravaVia=()=>lsSet(CH_VIA,viagens);
 const usuarioDe=v=>v.usuario||PADRAO;
-function visitaParaLinha(v){ return {id:v.id,data:v.data,hora:v.hora||null,usuario:v.usuario||null,cliente:v.cliente||null,cidade:v.cidade||null,rep:v.rep||null,objetivo:v.objetivo||null,resultado:v.resultado||null,status:v.status||'Agendada',viagem_id:v.viagemId||null,lat:v.lat??null,lon:v.lon??null,checkin_em:v.checkinEm||null,telefone:v.tel||null,endereco:v.endereco||null,updated_at:v._syncEm||new Date().toISOString()}; }
-function linhaParaVisita(l){ return {id:l.id,data:l.data,hora:l.hora||'',usuario:l.usuario||PADRAO,cliente:l.cliente||'',cidade:l.cidade||'',rep:l.rep||'',objetivo:l.objetivo||'',resultado:l.resultado||'',status:l.status||'Agendada',viagemId:l.viagem_id||undefined,lat:l.lat??undefined,lon:l.lon??undefined,checkinEm:l.checkin_em||undefined,tel:l.telefone||'',endereco:l.endereco||'',_syncEm:l.updated_at}; }
+function visitaParaLinha(v){ return {id:v.id,data:v.data,hora:v.hora||null,usuario:v.usuario||null,cliente:v.cliente||null,tipo:v.tipo||null,cidade:v.cidade||null,rep:v.rep||null,objetivo:v.objetivo||null,resultado:v.resultado||null,status:v.status||'Agendada',viagem_id:v.viagemId||null,lat:v.lat??null,lon:v.lon??null,checkin_em:v.checkinEm||null,telefone:v.tel||null,endereco:v.endereco||null,updated_at:v._syncEm||new Date().toISOString()}; }
+function linhaParaVisita(l){ return {id:l.id,data:l.data,hora:l.hora||'',usuario:l.usuario||PADRAO,cliente:l.cliente||'',tipo:l.tipo||'',cidade:l.cidade||'',rep:l.rep||'',objetivo:l.objetivo||'',resultado:l.resultado||'',status:l.status||'Agendada',viagemId:l.viagem_id||undefined,lat:l.lat??undefined,lon:l.lon??undefined,checkinEm:l.checkin_em||undefined,tel:l.telefone||'',endereco:l.endereco||'',_syncEm:l.updated_at}; }
 function viagemParaLinha(v){ return {id:v.id,titulo:v.titulo||'',rep:v.rep||null,usuario:usuarioDe(v),cidade:v.cidade||null,ini:v.ini||null,fim:v.fim||null,status:v.status||null,transp:v.transp||null,obs:v.obs||null,resultado:v.resultado||null,propostas:(v.propostas&&v.propostas.length)?v.propostas:null,anexos:(v.anexos&&v.anexos.length)?v.anexos:null,confirmada_em:v.confirmadaEm||null,updated_at:v._syncEm||new Date().toISOString()}; }
 function linhaParaViagem(l){ return {id:l.id,titulo:l.titulo,rep:l.rep||undefined,usuario:l.usuario||PADRAO,cidade:l.cidade||undefined,ini:l.ini,fim:l.fim,status:l.status,transp:l.transp||undefined,obs:l.obs||'',resultado:l.resultado||'',propostas:Array.isArray(l.propostas)?l.propostas:[],anexos:Array.isArray(l.anexos)?l.anexos:[],confirmadaEm:l.confirmada_em||undefined,_syncEm:l.updated_at}; }
 function setSync(ok){ $('sync').classList.toggle('off',!ok); $('sync').title=ok?'Sincronizado':'Sem conexão: salvo no aparelho, envia quando voltar'; }
@@ -179,7 +179,7 @@ function cartaoVisita(v){
   const tel=String(v.tel||'').replace(/\D/g,'');
   return `<div class="card"><div class="l1"><div class="hora">${esc(v.hora||'--:--')}</div><div style="flex:1;min-width:0">
     <div class="nome">${esc(v.cliente)}<span class="st" style="background:${COR[v.status]||'#999'}">${esc(v.status)}</span></div>
-    <div class="sub">${esc(v.cidade||'')}${v.endereco?' · '+esc(v.endereco):''}</div>
+    <div class="sub">${v.tipo?`<b>${esc(v.tipo)}</b> · `:''}${esc(v.cidade||'')}${v.endereco?' · '+esc(v.endereco):''}</div>
     ${v.objetivo?`<div class="sub">🎯 ${esc(v.objetivo)}</div>`:''}
     ${v.checkinEm?`<div class="sub" style="color:var(--ok)">✔ Check-in às ${new Date(v.checkinEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>`:''}
     ${v.resultado?`<div class="res"><b>Resultado:</b> ${esc(v.resultado)}</div>`:''}
@@ -225,6 +225,7 @@ function formVisita(v,titulo){
     <div class="hint" id="fDica"></div>
     <label class="f">Cliente</label><input id="fCliente" value="${esc(v.cliente||'')}" placeholder="Digite o nome ou o código…" autocomplete="off" oninput="buscaCliente()" onfocus="carregarClientes()">
     <div class="sug" id="fSug" style="display:none"></div>
+    <label class="f">Tipo de cliente</label><select id="fTipo"><option value="">—</option>${['Distribuidor','Retífica','Mecânica'].map(s=>`<option ${v.tipo===s?'selected':''}>${s}</option>`).join('')}</select>
     <label class="f">Cidade / UF</label><input id="fCidade" value="${esc(v.cidade||'')}" placeholder="Ex.: Fortaleza - CE">
     <label class="f">Telefone</label><input id="fTel" type="tel" value="${esc(v.tel||'')}" placeholder="(85) 99999-9999">
     <label class="f">Endereço</label><input id="fEnd" value="${esc(v.endereco||'')}" placeholder="Rua, número, bairro">
@@ -243,7 +244,7 @@ async function salvarVisita(outra){
   const data=$('fData').value, cliente=$('fCliente').value.trim();
   if(!data||!cliente){ toast('Informe a data e o cliente'); return; }
   const id=$('fId').value, vg=viagemDoDia(data);
-  const dados={data,hora:$('fHora').value,usuario,cliente,cidade:$('fCidade').value.trim(),tel:$('fTel').value.trim(),endereco:$('fEnd').value.trim(),rep:$('fRep').value,objetivo:$('fObj').value.trim(),resultado:$('fRes').value.trim(),status:$('fSt').value,viagemId:vg?vg.id:undefined};
+  const dados={data,hora:$('fHora').value,usuario,cliente,tipo:$('fTipo').value,cidade:$('fCidade').value.trim(),tel:$('fTel').value.trim(),endereco:$('fEnd').value.trim(),rep:$('fRep').value,objetivo:$('fObj').value.trim(),resultado:$('fRes').value.trim(),status:$('fSt').value,viagemId:vg?vg.id:undefined};
   let alvo; if(id){ alvo=visitas.find(x=>x.id===+id); Object.assign(alvo,dados); } else { dados.id=Date.now(); visitas.push(dados); alvo=dados; }
   alvo._syncEm=new Date().toISOString(); gravaV(); renderTudo();
   const ok=await enviar('agenda_visitas',[alvo],visitaParaLinha); toast(ok?'Visita salva ✓':'Salva no aparelho (sem internet)');
