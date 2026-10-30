@@ -376,6 +376,9 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('/m/sw.js').ca
 montarNav(); aba('hoje');
 if(!usuario) escolherUsuario(); else { renderTudo(); }
 sincronizar();
+// sincroniza ao voltar para o app, ao reconectar e a cada 30 s
+const _sinc=()=>{ if(!document.hidden&&!document.querySelector('.sheet-bg.on')) sincronizar(); };
+document.addEventListener('visibilitychange',_sinc); window.addEventListener('online',_sinc); setInterval(_sinc,30000);
 </script>
 </body>
 </html>
