@@ -149,7 +149,9 @@ async function sincronizar(){
   try{
     const rv=((await sb('agenda_visitas?select=*'))||[]).map(linhaParaVisita), rp=((await sb('agenda_viagens?select=*'))||[]).map(linhaParaViagem);
     const merge=(local,remotos)=>{ const por={},env=[]; remotos.forEach(r=>por[r.id]=r); let mud=false;
-      remotos.forEach(r=>{ const i=local.findIndex(x=>x.id===r.id); if(i<0){ local.push(r); mud=true; } else { const a=new Date(local[i]._syncEm||0).getTime(), b=new Date(r._syncEm||0).getTime(); if(b>a){ local[i]=r; mud=true; } else if(a>b) env.push(local[i]); } });
+      remotos.forEach(r=>{ const i=local.findIndex(x=>x.id===r.id);
+        if(r.status==='Excluida'){ if(i>=0&&new Date(local[i]._syncEm||0).getTime()<=new Date(r._syncEm||0).getTime()){ local.splice(i,1); mud=true; } return; }
+        if(i<0){ local.push(r); mud=true; } else { const a=new Date(local[i]._syncEm||0).getTime(), b=new Date(r._syncEm||0).getTime(); if(b>a){ local[i]=r; mud=true; } else if(a>b) env.push(local[i]); } });
       local.forEach(x=>{ if(!por[x.id]) env.push(x); }); return {mud,env}; };
     const a=merge(visitas,rv), b=merge(viagens,rp);
     if(a.mud) gravaV(); if(b.mud) gravaVia();
@@ -252,8 +254,9 @@ async function salvarVisita(outra){
 }
 async function excluirVisita(id){
   if(!confirm('Excluir esta visita?')) return;
+  const v=visitas.find(x=>x.id===id);
   visitas=visitas.filter(x=>x.id!==id); gravaV(); fecharSheet(); renderTudo();
-  try{ await sb('agenda_visitas?id=eq.'+id,{method:'DELETE',headers:{Prefer:'return=minimal'}}); }catch(e){ console.error(e); }
+  if(v){ v.status='Excluida'; v._syncEm=new Date().toISOString(); await enviar('agenda_visitas',[v],visitaParaLinha); }   // lápide na nuvem: outro aparelho não devolve a visita
 }
 function concluir(id){
   const v=visitas.find(x=>x.id===id); if(!v) return;
