@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Riosulense Campo</title>
+<link rel="manifest" href="/m/manifest.webmanifest">
+<meta name="theme-color" content="#FE5000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Campo">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<style>
+:root{--or:#FE5000;--or2:#FFF1EA;--bd:#EADFD8;--tx:#222;--mut:#7a6d65;--ok:#1E8A4C;--warn:#D68910;--red:#C0392B}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#F4F1EF;color:var(--tx);padding-bottom:calc(66px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;z-index:20;background:var(--or);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;align-items:center;gap:10px}
+header h1{font-size:1.05rem;flex:1;line-height:1.1}
+header h1 small{display:block;font-weight:500;font-size:.7rem;opacity:.9}
+.chip{background:rgba(255,255,255,.2);border:0;color:#fff;border-radius:999px;padding:7px 12px;font-weight:700;font-size:.82rem}
+#sync{width:10px;height:10px;border-radius:50%;background:#9fe3b6}
+#sync.off{background:#ffd27a}
+main{padding:12px}
+.tab{display:none}.tab.on{display:block}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:#fff;border-top:1px solid var(--bd);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;padding:9px 2px 8px;font-size:.68rem;color:var(--mut);font-weight:700;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button span{font-size:1.35rem;line-height:1}
+nav button.on{color:var(--or)}
+h2{font-size:1rem;margin:4px 2px 10px}
+.resumo{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.pill{background:#fff;border:1px solid var(--bd);border-radius:999px;padding:6px 12px;font-size:.8rem}
+.pill b{color:var(--or)}
+.banner{background:#E8F1FF;border-left:4px solid #3b82f6;border-radius:8px;padding:9px 12px;font-size:.85rem;margin-bottom:12px}
+.card{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:13px;margin-bottom:11px}
+.card .l1{display:flex;gap:10px;align-items:flex-start}
+.hora{font-weight:800;color:var(--or);font-size:1.05rem;min-width:56px}
+.nome{font-weight:700;font-size:1rem;word-break:break-word}
+.sub{font-size:.82rem;color:var(--mut);margin-top:3px;word-break:break-word}
+.st{display:inline-block;font-size:.68rem;font-weight:700;color:#fff;border-radius:999px;padding:2px 9px;margin-left:6px;vertical-align:middle}
+.res{margin-top:8px;background:#EAF7EE;border-left:3px solid var(--ok);border-radius:6px;padding:7px 9px;font-size:.84rem}
+.acoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:7px;margin-top:11px}
+.btn{border:0;border-radius:11px;padding:12px 8px;font-size:.88rem;font-weight:700;background:#fff;color:var(--or);border:1.5px solid var(--or);text-align:center;text-decoration:none;display:block}
+.btn.p{background:var(--or);color:#fff}
+.btn.g{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.d{background:#fff;border-color:var(--red);color:var(--red)}
+.btn.s{background:#F4F1EF;border-color:#d8cfc9;color:#555}
+.fab{position:fixed;right:16px;bottom:calc(80px + env(safe-area-inset-bottom));z-index:19;background:var(--or);color:#fff;border:0;border-radius:999px;padding:15px 20px;font-weight:800;font-size:.95rem;box-shadow:0 6px 18px rgba(254,80,0,.45)}
+.vazio{text-align:center;color:#a79a92;padding:34px 10px;font-size:.95rem}
+.dia-h{font-weight:800;font-size:.85rem;color:var(--mut);margin:14px 4px 6px;text-transform:capitalize}
+.mes{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid var(--bd);border-radius:12px;padding:6px;margin-bottom:10px}
+.mes button{border:0;background:var(--or2);color:var(--or);font-weight:800;border-radius:9px;padding:9px 16px;font-size:1rem}
+.mes b{text-transform:capitalize}
+/* folha (bottom sheet) */
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;display:none;align-items:flex-end}
+.sheet-bg.on{display:flex}
+.sheet{background:#fff;width:100%;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom))}
+.sheet h3{font-size:1.1rem;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.sheet h3 span{font-size:1.7rem;color:var(--mut);padding:0 6px}
+label.f{display:block;font-size:.72rem;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin:11px 0 5px}
+input,select,textarea{width:100%;font:inherit;font-size:1rem;padding:12px;border:1.5px solid var(--bd);border-radius:11px;background:#fff}
+textarea{min-height:76px;resize:vertical}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sug{border:1.5px solid var(--bd);border-radius:11px;margin-top:4px;overflow:hidden}
+.sug button{display:block;width:100%;text-align:left;border:0;background:#fff;padding:10px 12px;border-bottom:1px solid #f1e9e3;font:inherit;font-size:.9rem}
+.sug button small{display:block;color:var(--mut);font-size:.76rem}
+.hint{font-size:.78rem;color:var(--mut);margin-top:5px}
+.busca{position:sticky;top:calc(56px + env(safe-area-inset-top));z-index:10;background:#F4F1EF;padding:4px 0 8px}
+table.t{width:100%;border-collapse:collapse;font-size:.88rem}
+table.t th{text-align:left;font-size:.7rem;color:var(--mut);text-transform:uppercase;padding:6px 4px;border-bottom:2px solid var(--bd)}
+table.t td{padding:8px 4px;border-bottom:1px solid #f1e9e3}
+table.t td.n,table.t th.n{text-align:right}
+.zero{color:var(--red);font-weight:800}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom));background:#222;color:#fff;border-radius:999px;padding:10px 18px;font-size:.85rem;z-index:99;display:none}
+.quem button{margin-bottom:10px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Riosulense Campo<small id="hSub"></small></h1>
+  <span id="sync" title="Sincronização"></span>
+  <button class="chip" id="chipUsu" onclick="escolherUsuario()">—</button>
+</header>
+
+<main>
+  <section class="tab on" id="tab-hoje"></section>
+  <section class="tab" id="tab-visitas"></section>
+  <section class="tab" id="tab-viagens"></section>
+  <section class="tab" id="tab-pecas"></section>
+</main>
+
+<button class="fab" id="fab" onclick="novaVisita()">+ Visita</button>
+
+<nav>
+  <button id="n-hoje" class="on" onclick="aba('hoje')"><span>🏠</span>Hoje</button>
+  <button id="n-visitas" onclick="aba('visitas')"><span>📍</span>Visitas</button>
+  <button id="n-viagens" onclick="aba('viagens')"><span>🧳</span>Viagens</button>
+  <button id="n-pecas" onclick="aba('pecas')"><span>🔎</span>Peças</button>
+</nav>
+
+<div class="sheet-bg" id="sheet" onclick="if(event.target===this)fecharSheet()"><div class="sheet" id="sheetBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== Riosulense Campo — versão celular. Usa os MESMOS dados do app (Supabase + mesmos nomes de armazenamento local). ===== */
+const SB_URL='https://wpjroobpgboaeuarhiue.supabase.co', SB_KEY='sb_publishable_DPTWMKwBRz2SMzBPbVYwlg_eitR1I1R';
+async function sb(path,opt){
+  const r=await fetch(SB_URL+'/rest/v1/'+path,Object.assign({},opt,{headers:Object.assign({apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json'},(opt&&opt.headers)||{})}));
+  if(!r.ok) throw new Error('HTTP '+r.status+' '+await r.text().catch(()=>''));
+  if(r.status===204) return null; const t=await r.text(); return t?JSON.parse(t):null;
+}
+const USUARIOS=['Oziano','Pamela','Beto','Gustavo','Samuel'], PADRAO='Oziano';
+const REPS=['Emprol','Ig Representações','RBR Representações','ATIVA Representações','ALCA Representações','CONVERT Representações','BROCK Representações','Diogo Santana','PROATIVA Representações','VIOLANTE Representações','Direto SC','Direto RS','MARK PRESS Representações','JUNIORCAR Representações','Riosulense (interno)','Outro'];
+const CH_USU='agenda_usuario_eu', CH_VIS='visitas_riosulense_v1', CH_VIA='viagens_riosulense_v2', CH_CLI='campo_clientes_v1';
+const COR={Agendada:'#D68910',Feita:'#1E8A4C',Cancelada:'#8a8a8a'};
+const $=id=>document.getElementById(id);
+const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const lsGet=(k,d)=>{ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } };
+const lsSet=(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} };
+const iso=d=>{ const x=new Date(d); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); };
+const hoje=()=>iso(new Date());
+const fmtData=(d,o)=>new Date(d+'T12:00:00').toLocaleDateString('pt-BR',o||{weekday:'long',day:'2-digit',month:'long'});
+const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+function toast(m){ const t=$('toast'); t.textContent=m; t.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>t.style.display='none',2400); }
+
+/* ---------- usuário ---------- */
+let usuario=(()=>{ try{ const u=localStorage.getItem(CH_USU); return USUARIOS.includes(u)?u:null; }catch(e){ return null; } })();
+function definirUsuario(u){ usuario=u; try{ localStorage.setItem(CH_USU,u); }catch(e){} $('chipUsu').textContent=u; fecharSheet(); montarNav(); renderTudo(); }
+function escolherUsuario(){
+  abrirSheet(`<h3>Quem é você?<span onclick="fecharSheet()">×</span></h3><div class="quem">${USUARIOS.map(u=>`<button class="btn p" style="width:100%" onclick="definirUsuario('${u}')">${u}</button>`).join('')}</div>`);
+}
+function montarNav(){ $('n-pecas').style.display=usuario==='Samuel'?'':'none'; }   // leitura de estoque é do Samuel, como no app
+
+/* ---------- dados: visitas e viagens (mesmos nomes do app => compartilham o armazenamento do navegador) ---------- */
+let visitas=lsGet(CH_VIS,[]), viagens=lsGet(CH_VIA,[]);
+const gravaV=()=>lsSet(CH_VIS,visitas), gravaVia=()=>lsSet(CH_VIA,viagens);
+const usuarioDe=v=>v.usuario||PADRAO;
+function visitaParaLinha(v){ return {id:v.id,data:v.data,hora:v.hora||null,usuario:v.usuario||null,cliente:v.cliente||null,cidade:v.cidade||null,rep:v.rep||null,objetivo:v.objetivo||null,resultado:v.resultado||null,status:v.status||'Agendada',viagem_id:v.viagemId||null,lat:v.lat??null,lon:v.lon??null,checkin_em:v.checkinEm||null,telefone:v.tel||null,endereco:v.endereco||null,updated_at:v._syncEm||new Date().toISOString()}; }
+function linhaParaVisita(l){ return {id:l.id,data:l.data,hora:l.hora||'',usuario:l.usuario||PADRAO,cliente:l.cliente||'',cidade:l.cidade||'',rep:l.rep||'',objetivo:l.objetivo||'',resultado:l.resultado||'',status:l.status||'Agendada',viagemId:l.viagem_id||undefined,lat:l.lat??undefined,lon:l.lon??undefined,checkinEm:l.checkin_em||undefined,tel:l.telefone||'',endereco:l.endereco||'',_syncEm:l.updated_at}; }
+function viagemParaLinha(v){ return {id:v.id,titulo:v.titulo||'',rep:v.rep||null,usuario:usuarioDe(v),cidade:v.cidade||null,ini:v.ini||null,fim:v.fim||null,status:v.status||null,transp:v.transp||null,obs:v.obs||null,resultado:v.resultado||null,propostas:(v.propostas&&v.propostas.length)?v.propostas:null,anexos:(v.anexos&&v.anexos.length)?v.anexos:null,confirmada_em:v.confirmadaEm||null,updated_at:v._syncEm||new Date().toISOString()}; }
+function linhaParaViagem(l){ return {id:l.id,titulo:l.titulo,rep:l.rep||undefined,usuario:l.usuario||PADRAO,cidade:l.cidade||undefined,ini:l.ini,fim:l.fim,status:l.status,transp:l.transp||undefined,obs:l.obs||'',resultado:l.resultado||'',propostas:Array.isArray(l.propostas)?l.propostas:[],anexos:Array.isArray(l.anexos)?l.anexos:[],confirmadaEm:l.confirmada_em||undefined,_syncEm:l.updated_at}; }
+function setSync(ok){ $('sync').classList.toggle('off',!ok); $('sync').title=ok?'Sincronizado':'Sem conexão: salvo no aparelho, envia quando voltar'; }
+async function enviar(tabela,lista,map){
+  if(!lista.length) return true;
+  try{ await sb(tabela+'?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(lista.map(map))}); setSync(true); return true; }
+  catch(e){ console.error(e); setSync(false); return false; }
+}
+async function sincronizar(){
+  try{
+    const rv=((await sb('agenda_visitas?select=*'))||[]).map(linhaParaVisita), rp=((await sb('agenda_viagens?select=*'))||[]).map(linhaParaViagem);
+    const merge=(local,remotos)=>{ const por={},env=[]; remotos.forEach(r=>por[r.id]=r); let mud=false;
+      remotos.forEach(r=>{ const i=local.findIndex(x=>x.id===r.id); if(i<0){ local.push(r); mud=true; } else { const a=new Date(local[i]._syncEm||0).getTime(), b=new Date(r._syncEm||0).getTime(); if(b>a){ local[i]=r; mud=true; } else if(a>b) env.push(local[i]); } });
+      local.forEach(x=>{ if(!por[x.id]) env.push(x); }); return {mud,env}; };
+    const a=merge(visitas,rv), b=merge(viagens,rp);
+    if(a.mud) gravaV(); if(b.mud) gravaVia();
+    await enviar('agenda_visitas',a.env,visitaParaLinha); await enviar('agenda_viagens',b.env,viagemParaLinha);
+    setSync(true); renderTudo();
+  }catch(e){ console.error(e); setSync(false); }
+}
+
+/* ---------- abas ---------- */
+let abaAtual='hoje', mesVis=hoje().slice(0,7);
+function aba(a){
+  abaAtual=a; document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id==='tab-'+a));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.id==='n-'+a));
+  $('fab').style.display=(a==='hoje'||a==='visitas')?'':'none';
+  if(a==='viagens') $('fab').style.display='';
+  $('fab').textContent=a==='viagens'?'+ Viagem':'+ Visita'; $('fab').onclick=a==='viagens'?()=>novaViagem():()=>novaVisita();
+  window.scrollTo(0,0); renderTudo();
+}
+function renderTudo(){ if(!usuario){ return; } $('chipUsu').textContent=usuario; $('hSub').textContent=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  ({hoje:renderHoje,visitas:renderVisitas,viagens:renderViagens,pecas:renderPecas})[abaAtual](); }
+const minhas=()=>visitas.filter(v=>v.usuario===usuario);
+const viagemDoDia=(d)=>viagens.find(v=>usuarioDe(v)===usuario&&d>=v.ini&&d<=(v.fim||v.ini)&&v.rep!=='Outro'&&v.status!=='Cancelada')||null;
+
+/* ---------- cartão de visita ---------- */
+function cartaoVisita(v){
+  const maps=(v.endereco||v.cliente)?`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent([v.endereco||v.cliente,v.cidade].filter(Boolean).join(', '))}`:'';
+  const tel=String(v.tel||'').replace(/\D/g,'');
+  return `<div class="card"><div class="l1"><div class="hora">${esc(v.hora||'--:--')}</div><div style="flex:1;min-width:0">
+    <div class="nome">${esc(v.cliente)}<span class="st" style="background:${COR[v.status]||'#999'}">${esc(v.status)}</span></div>
+    <div class="sub">${esc(v.cidade||'')}${v.endereco?' · '+esc(v.endereco):''}</div>
+    ${v.objetivo?`<div class="sub">🎯 ${esc(v.objetivo)}</div>`:''}
+    ${v.checkinEm?`<div class="sub" style="color:var(--ok)">✔ Check-in às ${new Date(v.checkinEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>`:''}
+    ${v.resultado?`<div class="res"><b>Resultado:</b> ${esc(v.resultado)}</div>`:''}
+  </div></div>
+  <div class="acoes">
+    ${maps?`<a class="btn" href="${maps}" target="_blank">🧭 Ir</a>`:''}
+    ${tel?`<a class="btn" href="tel:${tel}">📞 Ligar</a><a class="btn" href="https://wa.me/55${tel.replace(/^55/,'')}" target="_blank">💬 Whats</a>`:''}
+    ${v.status==='Agendada'&&!v.checkinEm?`<button class="btn s" onclick="checkin(${v.id})">📌 Cheguei</button>`:''}
+    ${v.status!=='Feita'?`<button class="btn g" onclick="concluir(${v.id})">✓ Concluir</button>`:''}
+    <button class="btn s" onclick="editarVisita(${v.id})">✎ Editar</button>
+  </div></div>`;
+}
+
+/* ---------- Hoje ---------- */
+function renderHoje(){
+  const d=hoje(), lista=minhas().filter(v=>v.data===d).sort((a,b)=>(a.hora||'99').localeCompare(b.hora||'99'));
+  const vg=viagemDoDia(d), feitas=lista.filter(v=>v.status==='Feita').length;
+  const prox=minhas().filter(v=>v.data>d&&v.status==='Agendada').sort((a,b)=>a.data.localeCompare(b.data)||(a.hora||'').localeCompare(b.hora||''))[0];
+  $('tab-hoje').innerHTML=`${vg?`<div class="banner">🧳 <b>Em viagem:</b> ${esc(vg.titulo)} — ${esc(vg.cidade||'')}</div>`:''}
+    <div class="resumo"><span class="pill"><b>${lista.length}</b> visita(s) hoje</span><span class="pill"><b>${feitas}</b> feita(s)</span><span class="pill"><b>${lista.length-feitas}</b> a fazer</span></div>
+    ${lista.length?lista.map(cartaoVisita).join(''):`<div class="vazio">Nenhuma visita hoje.<br>Toque em <b>+ Visita</b> para lançar.</div>`}
+    ${prox?`<h2>Próxima visita</h2><div class="card" onclick="editarVisita(${prox.id})"><div class="nome">${esc(prox.cliente)}</div><div class="sub">${esc(fmtData(prox.data))} ${esc(prox.hora||'')} · ${esc(prox.cidade||'')}</div></div>`:''}`;
+}
+
+/* ---------- Visitas (mês) ---------- */
+function renderVisitas(){
+  const lista=minhas().filter(v=>v.data.startsWith(mesVis)).sort((a,b)=>a.data.localeCompare(b.data)||(a.hora||'99').localeCompare(b.hora||'99'));
+  const dias=[...new Set(lista.map(v=>v.data))];
+  const nomeMes=new Date(mesVis+'-15T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  $('tab-visitas').innerHTML=`<div class="mes"><button onclick="mudarMes(-1)">‹</button><b>${nomeMes}</b><button onclick="mudarMes(1)">›</button></div>
+    <div class="resumo"><span class="pill"><b>${lista.length}</b> visita(s)</span><span class="pill"><b>${lista.filter(v=>v.status==='Feita').length}</b> feita(s)</span><span class="pill"><b>${dias.length}</b> dia(s)</span></div>
+    ${dias.length?dias.map(dia=>`<div class="dia-h">${esc(fmtData(dia))}</div>${lista.filter(v=>v.data===dia).map(cartaoVisita).join('')}`).join(''):`<div class="vazio">Nenhuma visita neste mês.</div>`}`;
+}
+function mudarMes(n){ const d=new Date(mesVis+'-15T12:00:00'); d.setMonth(d.getMonth()+n); mesVis=iso(d).slice(0,7); renderVisitas(); }
+
+/* ---------- Visita: formulário, clientes, check-in ---------- */
+function abrirSheet(h){ $('sheetBody').innerHTML=h; $('sheet').classList.add('on'); }
+function fecharSheet(){ $('sheet').classList.remove('on'); }
+function formVisita(v,titulo){
+  abrirSheet(`<h3>${titulo}<span onclick="fecharSheet()">×</span></h3>
+    <input type="hidden" id="fId" value="${v.id||''}">
+    <div class="duo"><div><label class="f">Data</label><input type="date" id="fData" value="${v.data}" onchange="dicaViagem()"></div><div><label class="f">Horário</label><input type="time" id="fHora" value="${esc(v.hora||'')}"></div></div>
+    <div class="hint" id="fDica"></div>
+    <label class="f">Cliente</label><input id="fCliente" value="${esc(v.cliente||'')}" placeholder="Digite o nome ou o código…" autocomplete="off" oninput="buscaCliente()" onfocus="carregarClientes()">
+    <div class="sug" id="fSug" style="display:none"></div>
+    <label class="f">Cidade / UF</label><input id="fCidade" value="${esc(v.cidade||'')}" placeholder="Ex.: Fortaleza - CE">
+    <label class="f">Telefone</label><input id="fTel" type="tel" value="${esc(v.tel||'')}" placeholder="(85) 99999-9999">
+    <label class="f">Endereço</label><input id="fEnd" value="${esc(v.endereco||'')}" placeholder="Rua, número, bairro">
+    <label class="f">Representante</label><select id="fRep"><option value="">—</option>${REPS.map(r=>`<option ${v.rep===r?'selected':''}>${r}</option>`).join('')}</select>
+    <label class="f">Objetivo</label><textarea id="fObj" placeholder="O que tratar na visita">${esc(v.objetivo||'')}</textarea>
+    <label class="f">Situação</label><select id="fSt">${['Agendada','Feita','Cancelada'].map(s=>`<option ${v.status===s?'selected':''}>${s}</option>`).join('')}</select>
+    <label class="f">Resultado</label><textarea id="fRes" placeholder="Preencha depois da visita">${esc(v.resultado||'')}</textarea>
+    <div class="acoes" style="margin-top:16px"><button class="btn p" onclick="salvarVisita(false)">Salvar</button>${v.id?'':`<button class="btn g" onclick="salvarVisita(true)">Salvar e outra</button>`}
+    ${v.id?`<button class="btn d" onclick="excluirVisita(${v.id})">Excluir</button>`:''}</div>`);
+  dicaViagem();
+}
+function novaVisita(data){ formVisita({data:data||hoje(),status:'Agendada'},'Nova visita'); }
+function editarVisita(id){ const v=visitas.find(x=>x.id===id); if(v) formVisita(v,'Editar visita'); }
+function dicaViagem(){ const d=$('fData').value, vg=d?viagemDoDia(d):null; $('fDica').textContent=vg?`🧳 Neste dia você está em viagem: ${vg.titulo} — ${vg.cidade||''}`:''; if(vg&&vg.cidade&&vg.cidade!=='—'&&!$('fCidade').value) $('fCidade').value=vg.cidade; }
+async function salvarVisita(outra){
+  const data=$('fData').value, cliente=$('fCliente').value.trim();
+  if(!data||!cliente){ toast('Informe a data e o cliente'); return; }
+  const id=$('fId').value, vg=viagemDoDia(data);
+  const dados={data,hora:$('fHora').value,usuario,cliente,cidade:$('fCidade').value.trim(),tel:$('fTel').value.trim(),endereco:$('fEnd').value.trim(),rep:$('fRep').value,objetivo:$('fObj').value.trim(),resultado:$('fRes').value.trim(),status:$('fSt').value,viagemId:vg?vg.id:undefined};
+  let alvo; if(id){ alvo=visitas.find(x=>x.id===+id); Object.assign(alvo,dados); } else { dados.id=Date.now(); visitas.push(dados); alvo=dados; }
+  alvo._syncEm=new Date().toISOString(); gravaV(); renderTudo();
+  const ok=await enviar('agenda_visitas',[alvo],visitaParaLinha); toast(ok?'Visita salva ✓':'Salva no aparelho (sem internet)');
+  if(outra&&!id){ const d=dados; formVisita({data:d.data,hora:'',cidade:d.cidade,rep:d.rep,status:'Agendada'},'Nova visita'); setTimeout(()=>$('fCliente').focus(),80); } else fecharSheet();
+}
+async function excluirVisita(id){
+  if(!confirm('Excluir esta visita?')) return;
+  visitas=visitas.filter(x=>x.id!==id); gravaV(); fecharSheet(); renderTudo();
+  try{ await sb('agenda_visitas?id=eq.'+id,{method:'DELETE',headers:{Prefer:'return=minimal'}}); }catch(e){ console.error(e); }
+}
+function concluir(id){
+  const v=visitas.find(x=>x.id===id); if(!v) return;
+  abrirSheet(`<h3>Concluir visita<span onclick="fecharSheet()">×</span></h3><div class="nome">${esc(v.cliente)}</div>
+    <label class="f">Como foi? (resultado)</label><textarea id="cRes" placeholder="Pedidos, combinados, próximos passos…">${esc(v.resultado||'')}</textarea>
+    <div class="acoes" style="margin-top:14px"><button class="btn g" onclick="confirmarConcluir(${id})">✓ Marcar como feita</button></div>`);
+  setTimeout(()=>$('cRes').focus(),80);
+}
+async function confirmarConcluir(id){
+  const v=visitas.find(x=>x.id===id); v.status='Feita'; v.resultado=$('cRes').value.trim(); v._syncEm=new Date().toISOString(); gravaV(); fecharSheet(); renderTudo();
+  const ok=await enviar('agenda_visitas',[v],visitaParaLinha); toast(ok?'Visita concluída ✓':'Salva no aparelho (sem internet)');
+}
+function checkin(id){
+  const v=visitas.find(x=>x.id===id); if(!v) return;
+  const gravar=(lat,lon)=>{ v.checkinEm=new Date().toISOString(); if(lat!=null){ v.lat=lat; v.lon=lon; } v._syncEm=new Date().toISOString(); gravaV(); renderTudo(); enviar('agenda_visitas',[v],visitaParaLinha); toast(lat!=null?'Check-in feito com localização ✓':'Check-in feito (sem localização)'); };
+  if(!navigator.geolocation){ gravar(null); return; }
+  toast('Obtendo localização…');
+  navigator.geolocation.getCurrentPosition(p=>gravar(+p.coords.latitude.toFixed(6),+p.coords.longitude.toFixed(6)),()=>gravar(null),{enableHighAccuracy:true,timeout:12000});
+}
+
+/* clientes (da Rota de visitas, vindos da planilha de vendas): preenchem nome, cidade, telefone e endereço */
+let clientes=null, carregandoCli=false;
+async function carregarClientes(){
+  if(clientes||carregandoCli) return;
+  const c=lsGet(CH_CLI,null); if(c&&c.list&&Date.now()-c.ts<86400000){ clientes=c.list; return; }
+  carregandoCli=true;
+  try{
+    const r=await sb('cliente360_rota_clientes?codigo_agrupador=eq.EST-PADRE-CICERO&select=clientes'); const o=(r&&r[0]&&r[0].clientes)||{}; const por={};
+    Object.keys(o).forEach(k=>{ const cod=k.split('|')[0], a=o[k]; if(!por[cod]) por[cod]={c:cod,n:a[0],e:[a[1],a[2]].filter(Boolean).join(', '),ci:a[3],u:a[4],t:a[6]}; });
+    clientes=Object.values(por); lsSet(CH_CLI,{ts:Date.now(),list:clientes});
+  }catch(e){ console.error(e); clientes=(c&&c.list)||[]; }
+  carregandoCli=false;
+}
+function buscaCliente(){
+  const t=norm($('fCliente').value).trim().split(/\s+/).filter(Boolean), box=$('fSug');
+  if(!clientes||!t.length||$('fCliente').value.trim().length<2){ box.style.display='none'; return; }
+  const ach=clientes.filter(c=>{ const x=norm(c.n+' '+c.c+' '+c.ci); return t.every(w=>x.includes(w)); }).slice(0,8);
+  box.style.display=ach.length?'block':'none';
+  box.innerHTML=ach.map((c,i)=>`<button onclick="pegaCliente('${c.c}')">${esc(c.n)}<small>${esc(c.ci||'')}${c.u?' / '+esc(c.u):''} · cód. ${esc(c.c)}</small></button>`).join('');
+}
+function pegaCliente(cod){
+  const c=clientes.find(x=>x.c===cod); if(!c) return;
+  $('fCliente').value=c.n; $('fCidade').value=[c.ci,c.u].filter(Boolean).join(' - '); $('fTel').value=c.t||''; $('fEnd').value=c.e||''; $('fSug').style.display='none';
+}
+
+/* ---------- Viagens ---------- */
+function renderViagens(){
+  const d=hoje(), minhasV=viagens.filter(v=>usuarioDe(v)===usuario).sort((a,b)=>a.ini.localeCompare(b.ini));
+  const futuras=minhasV.filter(v=>(v.fim||v.ini)>=d), passadas=minhasV.filter(v=>(v.fim||v.ini)<d).slice(-5).reverse();
+  const card=v=>`<div class="card" onclick="editarViagem(${v.id})"><div class="nome">${esc(v.titulo)}<span class="st" style="background:${v.status==='Confirmado'?'#1E8A4C':'#D68910'}">${esc(v.status||'')}</span></div>
+    <div class="sub">📅 ${esc(fmtData(v.ini,{day:'2-digit',month:'short'}))} a ${esc(fmtData(v.fim||v.ini,{day:'2-digit',month:'short'}))} · ${esc(v.cidade||'')}</div>
+    <div class="sub">${v.transp==='Avião'?'✈ Avião':'🚗 Carro'}${v.rep?' · '+esc(v.rep):''}</div>${v.obs?`<div class="sub">🎯 ${esc(v.obs)}</div>`:''}</div>`;
+  $('tab-viagens').innerHTML=`<h2>Próximas viagens</h2>${futuras.length?futuras.map(card).join(''):'<div class="vazio">Nenhuma viagem programada.</div>'}${passadas.length?`<h2 style="margin-top:18px">Últimas viagens</h2>${passadas.map(card).join('')}`:''}`;
+}
+function formViagem(v,titulo){
+  abrirSheet(`<h3>${titulo}<span onclick="fecharSheet()">×</span></h3><input type="hidden" id="gId" value="${v.id||''}">
+    <label class="f">Título / compromisso</label><input id="gTit" value="${esc(v.titulo||'')}" placeholder="Ex.: Reunião Padre Cícero">
+    <label class="f">Representante</label><select id="gRep">${REPS.map(r=>`<option ${(v.rep||'Riosulense (interno)')===r?'selected':''}>${r}</option>`).join('')}</select>
+    <label class="f">Cidade / UF</label><input id="gCid" value="${esc(v.cidade||'')}" placeholder="Ex.: Fortaleza - CE">
+    <div class="duo"><div><label class="f">Início</label><input type="date" id="gIni" value="${v.ini}"></div><div><label class="f">Término</label><input type="date" id="gFim" value="${v.fim||v.ini}"></div></div>
+    <div class="duo"><div><label class="f">Transporte</label><select id="gTr"><option ${v.transp!=='Avião'?'selected':''}>Carro</option><option ${v.transp==='Avião'?'selected':''}>Avião</option></select></div>
+    <div><label class="f">Status</label><select id="gSt"><option ${v.status!=='Reservado'?'selected':''}>Confirmado</option><option ${v.status==='Reservado'?'selected':''}>Reservado</option></select></div></div>
+    <label class="f">Objetivo</label><textarea id="gObs" placeholder="Clientes a visitar, hospedagem…">${esc(v.obs||'')}</textarea>
+    <div class="acoes" style="margin-top:16px"><button class="btn p" onclick="salvarViagem()">Salvar</button>${v.id?`<button class="btn d" onclick="excluirViagem(${v.id})">Excluir</button>`:''}</div>`);
+}
+function novaViagem(){ formViagem({ini:hoje(),fim:hoje()},'Nova viagem'); }
+function editarViagem(id){ const v=viagens.find(x=>x.id===id); if(v) formViagem(v,'Editar viagem'); }
+async function salvarViagem(){
+  const t=$('gTit').value.trim(), i=$('gIni').value; let f=$('gFim').value||i;
+  if(!t||!i){ toast('Informe o título e a data de início'); return; } if(f<i) f=i;
+  const dados={titulo:t,usuario,rep:$('gRep').value,cidade:$('gCid').value.trim()||'—',ini:i,fim:f,status:$('gSt').value,transp:$('gTr').value,obs:$('gObs').value.trim()};
+  const id=$('gId').value; let alvo; if(id){ alvo=viagens.find(x=>x.id===+id); Object.assign(alvo,dados); } else { Object.assign(dados,{id:Date.now(),resultado:'',propostas:[],anexos:[]}); viagens.push(dados); alvo=dados; }
+  alvo._syncEm=new Date().toISOString(); gravaVia(); fecharSheet(); renderTudo();
+  const ok=await enviar('agenda_viagens',[alvo],viagemParaLinha); toast(ok?'Viagem salva ✓':'Salva no aparelho (sem internet)');
+}
+async function excluirViagem(id){
+  if(!confirm('Excluir esta viagem?')) return;
+  viagens=viagens.filter(x=>x.id!==id); gravaVia(); fecharSheet(); renderTudo();
+  try{ await sb('agenda_viagens?id=eq.'+id,{method:'DELETE',headers:{Prefer:'return=minimal'}}); }catch(e){ console.error(e); }
+}
+
+/* ---------- Peças: consulta de estoque por loja, com foto (só Samuel) ---------- */
+let CAT=null, EST=null, FOTOS=null, termoPeca='';
+async function carregarPecas(){
+  if(CAT&&EST) return;
+  $('tab-pecas').innerHTML+=`<div class="vazio" id="pLoad">Carregando estoque…</div>`;
+  try{
+    const [cat,g,fo]=await Promise.all([fetch('/dados/catalogo.json').then(r=>r.json()),sb('cliente360_clientes?codigo_agrupador=eq.EST-PADRE-CICERO&select=compras,filiais'),fetch('/fotos/index.json').then(r=>r.ok?r.json():[]).catch(()=>[])]);
+    CAT=cat.map(a=>({c:a[0],p:a[1],f:a[2],m:a[3],cv:a[4],x:a[5],txt:norm(a[0]+' '+a[1]+' '+a[5])})); EST=g&&g[0]||{compras:{},filiais:[]}; FOTOS=new Set(fo);
+    CAT.forEach(p=>{ const pf=EST.compras[p.c]||{}; Object.keys(pf).forEach(l=>{ const v=pf[l]; if(v&&v.cc&&!p.cc){ p.cc=String(v.cc); p.txt+=' '+norm(p.cc); } }); });
+  }catch(e){ console.error(e); $('tab-pecas').innerHTML='<div class="vazio">Não consegui carregar o estoque agora. Verifique a internet.</div>'; CAT=null; return; }
+  renderPecas();
+}
+const qtd=v=>v==null?0:(typeof v==='number'?v:(v.total||0));
+function totaisPeca(c){ const pf=EST.compras[c]||{}; let e=0,vd=0; Object.keys(pf).forEach(l=>{ const v=pf[l]; e+=Math.max(0,qtd(v)); if(v&&Array.isArray(v.vm)) vd+=Math.max(0,v.vm.reduce((a,b)=>a+b,0)); }); return {e,vd}; }
+function renderPecas(){
+  if(usuario!=='Samuel'){ $('tab-pecas').innerHTML='<div class="vazio">A consulta de estoque está liberada só para o Samuel.</div>'; return; }
+  if(!CAT){ $('tab-pecas').innerHTML=`<div class="busca"><input id="pBusca" placeholder="🔎 Código, referência ou descrição…" disabled></div>`; carregarPecas(); return; }
+  const t=norm(termoPeca).trim().split(/\s+/).filter(Boolean);
+  const res=t.length?CAT.filter(p=>t.every(w=>p.txt.includes(w))).slice(0,40):[];
+  $('tab-pecas').innerHTML=`<div class="busca"><input id="pBusca" placeholder="🔎 Código, referência ou descrição…" value="${esc(termoPeca)}" oninput="termoPeca=this.value;clearTimeout(window._tp);window._tp=setTimeout(()=>{const p=this.selectionStart;renderPecas();const i=$('pBusca');i.focus();i.setSelectionRange(p,p);},250)"></div>
+    ${t.length?(res.length?res.map(p=>{ const k=totaisPeca(p.c); return `<div class="card" onclick="detalhePeca('${p.c}')"><div class="nome">${esc(p.p)}</div><div class="sub">${esc(p.c)}${p.cc?' · cód. '+esc(p.cc):''} · ${esc(p.f)} · curva ${esc(p.cv||'—')}</div><div class="sub">Estoque: <b class="${k.e?'':'zero'}">${k.e}</b> · Vendido: <b>${k.vd}</b>${FOTOS.has(p.c)?' · 📷':''}</div></div>`; }).join(''):'<div class="vazio">Nada encontrado.</div>'):'<div class="vazio">Digite o código, a referência ou a descrição da peça.</div>'}`;
+}
+function detalhePeca(c){
+  const p=CAT.find(x=>x.c===c), pf=EST.compras[c]||{}, nomes={}; (EST.filiais||[]).forEach(f=>nomes[f.codigo]=f.nome);
+  const linhas=Object.keys(pf).map(l=>{ const v=pf[l]; return {l,e:qtd(v),v:Array.isArray(v&&v.vm)?v.vm.reduce((a,b)=>a+b,0):0}; }).filter(x=>x.e!==0||x.v!==0).sort((a,b)=>b.e-a.e||b.v-a.v);
+  abrirSheet(`<h3>${esc(p.c)}<span onclick="fecharSheet()">×</span></h3>
+    ${FOTOS.has(c)?`<img src="/fotos/${c}.jpg" style="width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:#fff;border:1px solid var(--bd);margin-bottom:10px" onerror="this.remove()">`:''}
+    <div class="nome">${esc(p.p)}</div><div class="sub">${esc(p.f)} · ${esc(p.m)} · curva ${esc(p.cv||'—')}${p.cc?' · cód. '+esc(p.cc):''}</div>
+    <table class="t" style="margin-top:12px"><thead><tr><th>Loja</th><th class="n">Estoque</th><th class="n">Vendido</th></tr></thead><tbody>
+    ${linhas.map(x=>`<tr><td><b>${esc(x.l)}</b><div class="sub" style="margin:0">${esc(nomes[x.l]||'')}</div></td><td class="n ${x.e>0?'':'zero'}">${x.e}</td><td class="n">${x.v}</td></tr>`).join('')||'<tr><td colspan="3" class="sub">Sem movimento em nenhuma loja.</td></tr>'}</tbody></table>`);
+}
+
+/* ---------- início ---------- */
+window.addEventListener('online',sincronizar);
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/m/sw.js').catch(()=>{});
+montarNav(); aba('hoje');
+if(!usuario) escolherUsuario(); else { renderTudo(); }
+sincronizar();
+</script>
+</body>
+</html>
