@@ -231,7 +231,7 @@ function formVisita(v,titulo){
     <label class="f">Cidade / UF</label><input id="fCidade" value="${esc(v.cidade||'')}" placeholder="Ex.: Fortaleza - CE">
     <label class="f">Telefone</label><input id="fTel" type="tel" value="${esc(v.tel||'')}" placeholder="(85) 99999-9999">
     <label class="f">Endereço</label><input id="fEnd" value="${esc(v.endereco||'')}" placeholder="Rua, número, bairro">
-    <label class="f">Representante</label><select id="fRep"><option value="">—</option>${REPS.map(r=>`<option ${v.rep===r?'selected':''}>${r}</option>`).join('')}</select>
+    <label class="f">Representante</label><select id="fRep"><option value="">—</option>${REPS.map(r=>`<option value="${esc(r)}" ${v.rep===r?'selected':''}>${esc(r.toUpperCase())}</option>`).join('')}</select>
     <label class="f">Objetivo</label><textarea id="fObj" placeholder="O que tratar na visita">${esc(v.objetivo||'')}</textarea>
     <label class="f">Situação</label><select id="fSt">${['Agendada','Feita','Cancelada'].map(s=>`<option ${v.status===s?'selected':''}>${s}</option>`).join('')}</select>
     <label class="f">Resultado</label><textarea id="fRes" placeholder="Preencha depois da visita">${esc(v.resultado||'')}</textarea>
@@ -333,7 +333,7 @@ function renderViagens(){
 function formViagem(v,titulo){
   abrirSheet(`<h3>${titulo}<span onclick="fecharSheet()">×</span></h3><input type="hidden" id="gId" value="${v.id||''}">
     <label class="f">Título / compromisso</label><input id="gTit" value="${esc(v.titulo||'')}" placeholder="Ex.: Reunião Padre Cícero">
-    <label class="f">Representante</label><select id="gRep">${REPS.map(r=>`<option ${(v.rep||'Riosulense (interno)')===r?'selected':''}>${r}</option>`).join('')}</select>
+    <label class="f">Representante</label><select id="gRep">${REPS.map(r=>`<option value="${esc(r)}" ${(v.rep||'Riosulense (interno)')===r?'selected':''}>${esc(r.toUpperCase())}</option>`).join('')}</select>
     <label class="f">Cidade / UF</label><input id="gCid" value="${esc(v.cidade||'')}" placeholder="Ex.: Fortaleza - CE">
     <div class="duo"><div><label class="f">Início</label><input type="date" id="gIni" value="${v.ini}"></div><div><label class="f">Término</label><input type="date" id="gFim" value="${v.fim||v.ini}"></div></div>
     <div class="duo"><div><label class="f">Transporte</label><select id="gTr"><option ${v.transp!=='Avião'?'selected':''}>Carro</option><option ${v.transp==='Avião'?'selected':''}>Avião</option></select></div>
