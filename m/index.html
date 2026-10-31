@@ -73,6 +73,7 @@ table.t td.n,table.t th.n{text-align:right}
 .zero{color:var(--red);font-weight:800}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom));background:#222;color:#fff;border-radius:999px;padding:10px 18px;font-size:.85rem;z-index:99;display:none}
 .quem button{margin-bottom:10px}
+#fCliente,#fCidade,#fEnd,#fTipo,#fRep,#fObj,#fRes,.nome,.sub{text-transform:uppercase}
 </style>
 </head>
 <body>
@@ -258,7 +259,7 @@ async function salvarVisita(outra){
   const data=$('fData').value, cliente=$('fCliente').value.trim();
   if(!data||!cliente){ toast('Informe a data e o cliente'); return; }
   const id=$('fId').value, vg=viagemDoDia(data);
-  const dados={data,hora:$('fHora').value,usuario,cliente,tipo:$('fTipo').value,cidade:$('fCidade').value.trim(),tel:$('fTel').value.trim(),endereco:$('fEnd').value.trim(),rep:$('fRep').value,objetivo:$('fObj').value.trim(),resultado:$('fRes').value.trim(),status:$('fSt').value,viagemId:vg?vg.id:undefined};
+  const dados={data,hora:$('fHora').value,usuario,cliente:cliente.toUpperCase(),tipo:$('fTipo').value,cidade:$('fCidade').value.trim().toUpperCase(),tel:$('fTel').value.trim(),endereco:$('fEnd').value.trim(),rep:$('fRep').value,objetivo:$('fObj').value.trim(),resultado:$('fRes').value.trim(),status:$('fSt').value,viagemId:vg?vg.id:undefined};
   let alvo; if(id){ alvo=visitas.find(x=>x.id===+id); Object.assign(alvo,dados); } else { dados.id=Date.now(); visitas.push(dados); alvo=dados; }
   alvo._syncEm=new Date().toISOString(); gravaV(); renderTudo();
   const ok=await enviar('agenda_visitas',[alvo],visitaParaLinha); toast(ok?'Visita salva ✓':'Salva no aparelho (sem internet)');
