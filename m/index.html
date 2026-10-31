@@ -302,15 +302,22 @@ async function carregarClientes(){
   }catch(e){ console.error(e); clientes=(c&&c.list)||[]; }
   carregandoCli=false;
 }
+function todosClientes(){
+  const mapa={}, lista=[];
+  visitas.slice().sort((a,b)=>b.data.localeCompare(a.data)).forEach(v=>{ if(!v.cliente||v.status==='Excluida') return; const k=v.cliente.toUpperCase(); if(mapa[k]) return; mapa[k]=1; lista.push({c:'V'+lista.length,n:v.cliente,ci:v.cidade||'',u:'',t:v.tel||'',e:v.endereco||'',tipo:v.tipo||'',rep:v.rep||''}); });
+  (clientes||[]).forEach(c=>{ if(!mapa[c.n.toUpperCase()]) lista.push(c); });
+  return lista;
+}
 function buscaCliente(){
   const t=norm($('fCliente').value).trim().split(/\s+/).filter(Boolean), box=$('fSug');
-  if(!clientes||!t.length||$('fCliente').value.trim().length<2){ box.style.display='none'; return; }
-  const ach=clientes.filter(c=>{ const x=norm(c.n+' '+c.c+' '+c.ci); return t.every(w=>x.includes(w)); }).slice(0,8);
+  if(!t.length||$('fCliente').value.trim().length<1){ box.style.display='none'; return; }
+  const ach=todosClientes().filter(c=>{ const x=norm(c.n+' '+c.c+' '+c.ci); return t.every(w=>x.includes(w)); }).slice(0,8);
   box.style.display=ach.length?'block':'none';
   box.innerHTML=ach.map((c,i)=>`<button onclick="pegaCliente('${c.c}')">${esc(c.n)}<small>${esc(c.ci||'')}${c.u?' / '+esc(c.u):''} · cód. ${esc(c.c)}</small></button>`).join('');
 }
 function pegaCliente(cod){
-  const c=clientes.find(x=>x.c===cod); if(!c) return;
+  const c=todosClientes().find(x=>x.c===cod); if(!c) return;
+  if(c.tipo&&$('fTipo')) $('fTipo').value=c.tipo; if(c.rep&&$('fRep')) $('fRep').value=c.rep;
   $('fCliente').value=c.n; $('fCidade').value=[c.ci,c.u].filter(Boolean).join(' - '); $('fTel').value=c.t||''; $('fEnd').value=c.e||''; $('fSug').style.display='none';
 }
 
