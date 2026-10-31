@@ -223,7 +223,7 @@ function fecharSheet(){ $('sheet').classList.remove('on'); }
 function formVisita(v,titulo){
   abrirSheet(`<h3>${titulo}<span onclick="fecharSheet()">×</span></h3>
     <input type="hidden" id="fId" value="${v.id||''}">
-    <div class="duo"><div><label class="f">Data</label><input type="date" id="fData" value="${v.data}" onchange="dicaViagem()"></div><div><label class="f">Horário</label><input type="time" id="fHora" value="${esc(v.hora||'')}"></div></div>
+    <div class="duo"><div><label class="f">Data</label><input type="date" id="fData" value="${v.data}" onchange="dicaViagem()"></div><div><label class="f">Horário</label><input type="time" id="fHora" value="${esc(v.hora||'')}" oninput="this.dataset.auto=''"></div></div>
     <div class="hint" id="fDica"></div>
     <label class="f">Cliente</label><input id="fCliente" value="${esc(v.cliente||'')}" placeholder="Digite o nome ou o código…" autocomplete="off" oninput="buscaCliente()" onfocus="carregarClientes()">
     <div class="sug" id="fSug" style="display:none"></div>
@@ -241,7 +241,19 @@ function formVisita(v,titulo){
 }
 function novaVisita(data){ formVisita({data:data||hoje(),status:'Agendada'},'Nova visita'); }
 function editarVisita(id){ const v=visitas.find(x=>x.id===id); if(v) formVisita(v,'Editar visita'); }
-function dicaViagem(){ const d=$('fData').value, vg=d?viagemDoDia(d):null; $('fDica').textContent=vg?`🧳 Neste dia você está em viagem: ${vg.titulo} — ${vg.cidade||''}`:''; if(vg&&vg.cidade&&vg.cidade!=='—'&&!$('fCidade').value) $('fCidade').value=vg.cidade; }
+function sugerirHoraM(){
+  const hi=$('fHora'); if(!hi||$('fId').value) return;
+  if(hi.value && hi.dataset.auto!=='1') return;
+  const d=$('fData').value; if(!d) return;
+  const horas=visitas.filter(v=>v.data===d&&v.usuario===usuario&&v.hora&&v.status!=='Cancelada'&&v.status!=='Excluida').map(v=>v.hora).sort();
+  let min;
+  if(horas.length){ const p=horas[horas.length-1].split(':').map(Number); min=p[0]*60+p[1]+90; }
+  else if(d===hoje()){ const n=new Date(); min=Math.max(480,Math.ceil((n.getHours()*60+n.getMinutes())/30)*30); }
+  else min=480;
+  min=Math.min(min,20*60);
+  hi.value=String(Math.floor(min/60)).padStart(2,'0')+':'+String(min%60).padStart(2,'0'); hi.dataset.auto='1';
+}
+function dicaViagem(){ sugerirHoraM(); const d=$('fData').value, vg=d?viagemDoDia(d):null; $('fDica').textContent=vg?`🧳 Neste dia você está em viagem: ${vg.titulo} — ${vg.cidade||''}`:''; if(vg&&vg.cidade&&vg.cidade!=='—'&&!$('fCidade').value) $('fCidade').value=vg.cidade; }
 async function salvarVisita(outra){
   const data=$('fData').value, cliente=$('fCliente').value.trim();
   if(!data||!cliente){ toast('Informe a data e o cliente'); return; }
