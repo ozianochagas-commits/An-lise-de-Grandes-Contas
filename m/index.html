@@ -88,7 +88,7 @@ table.t td.n,table.t th.n{text-align:right}
   <section class="tab" id="tab-visitas"></section>
   <section class="tab" id="tab-viagens"></section>
   <section class="tab" id="tab-pecas"></section>
-  <div style="text-align:center;margin:22px 0 10px"><a href="/?completo=1" style="color:#7a6d65;font-size:.82rem;text-decoration:underline">🖥 Abrir a versão completa (dashboard)</a></div>
+  <div style="text-align:center;margin:22px 0 10px"><a href="/?completo=1" onclick="try{localStorage.setItem('preferir_celular','0')}catch(e){}" style="color:#7a6d65;font-size:.82rem;text-decoration:underline">🖥 Abrir a versão completa (dashboard)</a></div>
 </main>
 
 <button class="fab" id="fab" onclick="novaVisita()">+ Visita</button>
@@ -104,6 +104,7 @@ table.t td.n,table.t th.n{text-align:right}
 <div class="toast" id="toast"></div>
 
 <script>
+try{ localStorage.setItem('preferir_celular','1'); }catch(e){}
 /* ===== Riosulense Campo — versão celular. Usa os MESMOS dados do app (Supabase + mesmos nomes de armazenamento local). ===== */
 const SB_URL='https://wpjroobpgboaeuarhiue.supabase.co', SB_KEY='sb_publishable_DPTWMKwBRz2SMzBPbVYwlg_eitR1I1R';
 async function sb(path,opt){
