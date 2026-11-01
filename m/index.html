@@ -231,6 +231,9 @@ function formVisita(v,titulo){
     <label class="f">Cliente</label><input id="fCliente" value="${esc(v.cliente||'')}" placeholder="Digite o nome ou o código…" autocomplete="off" oninput="buscaCliente()" onfocus="carregarClientes()">
     <div class="sug" id="fSug" style="display:none"></div>
     <label class="f">Tipo de cliente</label><select id="fTipo"><option value="">—</option>${['Distribuidor','Retífica','Mecânica','Direto Rio'].map(s=>`<option ${v.tipo===s?'selected':''}>${s}</option>`).join('')}</select>
+    <button type="button" class="btn g" id="btnLoc" onclick="usarMinhaLocalizacao()" style="width:100%;margin-top:12px">📍 Usar onde estou agora (preenche cidade e endereço)</button>
+    <input type="hidden" id="fLat" value="${v.lat!=null?v.lat:''}"><input type="hidden" id="fLon" value="${v.lon!=null?v.lon:''}">
+    <div class="hint" id="fLocInfo"></div>
     <label class="f">Cidade / UF</label><input id="fCidade" value="${esc(v.cidade||'')}" placeholder="Ex.: Fortaleza - CE">
     <label class="f">Telefone</label><input id="fTel" type="tel" value="${esc(v.tel||'')}" placeholder="(85) 99999-9999">
     <label class="f">Endereço</label><input id="fEnd" value="${esc(v.endereco||'')}" placeholder="Rua, número, bairro">
@@ -257,7 +260,7 @@ async function salvarVisita(outra){
   const data=$('fData').value, cliente=$('fCliente').value.trim();
   if(!data||!cliente){ toast('Informe a data e o cliente'); return; }
   const id=$('fId').value, vg=viagemDoDia(data);
-  const dados={data,hora:$('fHora').value,usuario,cliente:cliente.toUpperCase(),tipo:$('fTipo').value,cidade:$('fCidade').value.trim().toUpperCase(),tel:$('fTel').value.trim(),endereco:$('fEnd').value.trim(),rep:$('fRep').value,objetivo:$('fObj').value.trim(),resultado:$('fRes').value.trim(),status:$('fSt').value,viagemId:vg?vg.id:undefined};
+  const dados={data,hora:$('fHora').value,usuario,cliente:cliente.toUpperCase(),tipo:$('fTipo').value,cidade:$('fCidade').value.trim().toUpperCase(),tel:$('fTel').value.trim(),endereco:$('fEnd').value.trim(),lat:($('fLat').value!==''?+$('fLat').value:(id?(visitas.find(x=>x.id===+id)||{}).lat:undefined)),lon:($('fLon').value!==''?+$('fLon').value:(id?(visitas.find(x=>x.id===+id)||{}).lon:undefined)),rep:$('fRep').value,objetivo:$('fObj').value.trim(),resultado:$('fRes').value.trim(),status:$('fSt').value,viagemId:vg?vg.id:undefined};
   let alvo; if(id){ alvo=visitas.find(x=>x.id===+id); Object.assign(alvo,dados); } else { dados.id=Date.now(); visitas.push(dados); alvo=dados; }
   alvo._syncEm=new Date().toISOString(); gravaV(); renderTudo();
   const ok=await enviar('agenda_visitas',[alvo],visitaParaLinha); toast(ok?'Visita salva ✓':'Salva no aparelho (sem internet)');
@@ -280,9 +283,39 @@ async function confirmarConcluir(id){
   const v=visitas.find(x=>x.id===id); v.status='Feita'; v.resultado=$('cRes').value.trim(); v._syncEm=new Date().toISOString(); gravaV(); fecharSheet(); renderTudo();
   const ok=await enviar('agenda_visitas',[v],visitaParaLinha); toast(ok?'Visita concluída ✓':'Salva no aparelho (sem internet)');
 }
+/* Localização -> endereço (OpenStreetMap/Nominatim). Só PREENCHE campos vazios; se já houver texto diferente, pergunta antes de trocar. */
+async function geoEndereco(lat,lon){
+  const r=await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=pt-BR&zoom=18&lat='+lat+'&lon='+lon,{headers:{'Accept':'application/json'}});
+  if(!r.ok) throw new Error('serviço de endereços indisponível');
+  const j=await r.json(), a=j.address||{};
+  const uf=String(a['ISO3166-2-lvl4']||'').split('-').pop(), cid=a.city||a.town||a.village||a.municipality||a.city_district||'';
+  const rua=[a.road,a.house_number].filter(Boolean).join(', '), bairro=a.suburb||a.neighbourhood||a.quarter||'';
+  return {endereco:[rua,bairro].filter(Boolean).join(' - '), cidade:[cid,uf].filter(Boolean).join(' - ').toUpperCase(), bruto:j.display_name||''};
+}
+function pegarPosicao(){
+  return new Promise((res,rej)=>{
+    if(!navigator.geolocation) return rej(new Error('Este aparelho não oferece localização.'));
+    navigator.geolocation.getCurrentPosition(p=>res({lat:+p.coords.latitude.toFixed(6),lon:+p.coords.longitude.toFixed(6),prec:Math.round(p.coords.accuracy||0)}),
+      e=>rej(new Error(e.code===1?'Permita a localização no navegador (cadeado ao lado do endereço do site).':'Não consegui obter a localização agora.')),{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  });
+}
+async function usarMinhaLocalizacao(){
+  const b=$('btnLoc'), info=$('fLocInfo'); b.disabled=true; b.textContent='📍 Obtendo localização…'; info.textContent='';
+  try{
+    const p=await pegarPosicao(); $('fLat').value=p.lat; $('fLon').value=p.lon;
+    info.textContent='Localização capturada ('+p.lat+', '+p.lon+(p.prec?' · precisão ~'+p.prec+' m':'')+'). Buscando endereço…';
+    let g=null; try{ g=await geoEndereco(p.lat,p.lon); }catch(e){ console.error(e); }
+    if(g){
+      const pôr=(id,novo,nome)=>{ if(!novo) return; const el=$(id), at=el.value.trim(); if(!at||at.toUpperCase()===novo.toUpperCase()) el.value=novo; else if(confirm(nome+' já está preenchido:\n"'+at+'"\n\nSubstituir por:\n"'+novo+'"?')) el.value=novo; };
+      pôr('fCidade',g.cidade,'A cidade'); pôr('fEnd',g.endereco,'O endereço');
+      info.textContent='📍 '+(g.bruto||'Endereço encontrado')+' — confira e ajuste se precisar.';
+    } else info.textContent='Localização salva ('+p.lat+', '+p.lon+'), mas não consegui buscar o endereço (sem internet?). Digite o endereço.';
+  }catch(e){ info.textContent='⚠ '+e.message; }
+  b.disabled=false; b.textContent='📍 Usar onde estou agora (preenche cidade e endereço)';
+}
 function checkin(id){
   const v=visitas.find(x=>x.id===id); if(!v) return;
-  const gravar=(lat,lon)=>{ v.checkinEm=new Date().toISOString(); if(lat!=null){ v.lat=lat; v.lon=lon; } v._syncEm=new Date().toISOString(); gravaV(); renderTudo(); enviar('agenda_visitas',[v],visitaParaLinha); toast(lat!=null?'Check-in feito com localização ✓':'Check-in feito (sem localização)'); };
+  const gravar=(lat,lon)=>{ v.checkinEm=new Date().toISOString(); if(lat!=null){ v.lat=lat; v.lon=lon; if(!v.endereco||!v.cidade){ geoEndereco(lat,lon).then(g=>{ if(!v.endereco&&g.endereco) v.endereco=g.endereco; if(!v.cidade&&g.cidade) v.cidade=g.cidade; v._syncEm=new Date().toISOString(); gravaV(); renderTudo(); enviar('agenda_visitas',[v],visitaParaLinha); }).catch(()=>{}); } } v._syncEm=new Date().toISOString(); gravaV(); renderTudo(); enviar('agenda_visitas',[v],visitaParaLinha); toast(lat!=null?'Check-in feito com localização ✓':'Check-in feito (sem localização)'); };
   if(!navigator.geolocation){ gravar(null); return; }
   toast('Obtendo localização…');
   navigator.geolocation.getCurrentPosition(p=>gravar(+p.coords.latitude.toFixed(6),+p.coords.longitude.toFixed(6)),()=>gravar(null),{enableHighAccuracy:true,timeout:12000});
