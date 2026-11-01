@@ -247,11 +247,7 @@ function sugerirHoraM(){
   if(hi.value && hi.dataset.auto!=='1') return;
   const d=$('fData').value; if(!d) return;
   const horas=visitas.filter(v=>v.data===d&&v.usuario===usuario&&v.hora&&v.status!=='Cancelada'&&v.status!=='Excluida').map(v=>v.hora).sort();
-  let min;
-  if(d===hoje()){ const n=new Date(); min=n.getHours()*60+n.getMinutes(); }   // hoje: horário real de agora
-  else if(horas.length){ const p=horas[horas.length-1].split(':').map(Number); min=p[0]*60+p[1]+90; }
-  else min=480;
-  if(d!==hoje()) min=Math.min(min,20*60);
+  const n=new Date(), min=n.getHours()*60+n.getMinutes();   // SEMPRE o horário real de agora, em qualquer data
   hi.value=String(Math.floor(min/60)).padStart(2,'0')+':'+String(min%60).padStart(2,'0'); hi.dataset.auto='1';
 }
 function dicaViagem(){ sugerirHoraM(); const d=$('fData').value, vg=d?viagemDoDia(d):null; $('fDica').textContent=vg?`🧳 Neste dia você está em viagem: ${vg.titulo} — ${vg.cidade||''}`:''; if(vg&&vg.cidade&&vg.cidade!=='—'&&!$('fCidade').value) $('fCidade').value=vg.cidade; }
