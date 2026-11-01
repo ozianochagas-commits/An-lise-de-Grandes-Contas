@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <script>
-/* Quem já usa a versão celular (/m/) neste aparelho: o endereço principal abre direto nela. Os demais veem o painel completo, já adaptado ao celular. */
+/* Em QUALQUER celular, para qualquer usuário, o endereço principal abre direto a versão celular (/m/). Para o painel completo no celular: link "Abrir a versão completa" ou ?completo=1. */
 (function(){ try{
   var q=location.search||''; if(/[?&]completo=1/.test(q)) sessionStorage.setItem('ficar_completo','1');
   var cel=/Android|iPhone|iPod|Mobile/i.test(navigator.userAgent) && Math.min(screen.width,screen.height)<=700;
-  if(cel && localStorage.getItem('preferir_celular')==='1' && !sessionStorage.getItem('ficar_completo')) location.replace('/m/');
+  if(cel && !sessionStorage.getItem('ficar_completo')) location.replace('/m/');
 }catch(e){} })();
 </script>
 <meta charset="UTF-8">
