@@ -1076,7 +1076,10 @@ try{
   if(__sec && /^[a-z0-9]+$/.test(__sec) && !/[#&](s|b|d)=|[?&]view=/.test(location.hash + location.search)) document.documentElement.setAttribute('data-secao', __sec);
 }catch(e){}
 </script>
-<style id="mobBanner">#mobBanner{display:none}@media(max-width:700px){#mobBanner{display:flex;position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:#FE5000;color:#fff;border-radius:14px;padding:14px 16px;font:700 16px system-ui,sans-serif;text-decoration:none;align-items:center;justify-content:space-between;box-shadow:0 4px 16px rgba(0,0,0,.3)}}</style><style id="mobAdapt">
+<style id="mobBanner">#mobBanner{display:none}@media(max-width:700px){#mobBanner{display:flex;position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:#FE5000;color:#fff;border-radius:14px;padding:14px 16px;font:700 16px system-ui,sans-serif;text-decoration:none;align-items:center;justify-content:space-between;box-shadow:0 4px 16px rgba(0,0,0,.3)}}</style><style id="ocultaRodape">/* rodapé repetido/quebrado ("Dashboard RIOSULENSE … nbsp;") escondido na tela; continua disponível na impressão */
+@media screen{body > footer, footer{display:none !important}}
+</style>
+<style id="mobAdapt">
 /* ===== Adaptação para celular (todas as seções). Só vale em telas estreitas; computador e impressão não mudam ===== */
 @media screen and (max-width:700px){
   html,body{max-width:100vw;overflow-x:hidden}
