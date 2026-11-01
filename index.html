@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<script>
+/* No celular, o endereço principal abre direto a versão celular (/m/). Para ver a versão completa no celular: acrescente ?completo=1 ao endereço. */
+(function(){ try{
+  var q=location.search||''; if(/[?&]completo=1/.test(q)) sessionStorage.setItem('ficar_completo','1');
+  var cel=/Android|iPhone|iPod|Mobile/i.test(navigator.userAgent) && Math.min(screen.width,screen.height)<=700;
+  if(cel && !sessionStorage.getItem('ficar_completo')) location.replace('/m/');
+}catch(e){} })();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="/manifest.webmanifest">
