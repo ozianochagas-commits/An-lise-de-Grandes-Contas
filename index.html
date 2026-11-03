@@ -737,7 +737,7 @@
   // Sobe as edições de META/REALIZADO/CENÁRIO/CARTEIRA para o Supabase,
   // para que qualquer pessoa que abra o dashboard veja os mesmos dados
   // (antes disso, as edições só ficavam salvas no navegador de quem editou).
-  async function salvarDadosMensaisSupabase(mes) {
+  async function salvarDadosMensaisSupabase(mes, snap) {
     initSupabase();
     if (!window.supabaseClient) return { cloud: false, motivo: 'Supabase não inicializado' };
 
@@ -747,7 +747,7 @@
     // getVals() lê o valor ATUAL dos inputs (o que o usuário digitou),
     // igual ao que a tela usa para recalcular — não usar BASE aqui, que só
     // é atualizado quando os dados são carregados, não a cada edição.
-    const vals = (typeof getVals === 'function') ? getVals() : BASE;
+    const vals = snap || ((typeof getVals === 'function') ? getVals() : BASE);
     const rows = vals
       .filter(r => idsPorNome[r.name] !== undefined)
       .map(r => ({
@@ -954,7 +954,10 @@
   let __syncDadosMensaisTimer = null;
   function agendarSyncDadosMensais(mes) {
     if (__syncDadosMensaisTimer) clearTimeout(__syncDadosMensaisTimer);
-    __syncDadosMensaisTimer = setTimeout(() => { salvarDadosMensaisSupabase(mes); }, 900);
+    // Guarda uma FOTO dos valores agora: se o mês for trocado antes de gravar,
+    // os números do mês antigo continuam indo para o mês antigo (nunca misturam).
+    const foto = (typeof getVals === 'function') ? JSON.parse(JSON.stringify(getVals())) : null;
+    __syncDadosMensaisTimer = setTimeout(() => { salvarDadosMensaisSupabase(mes, foto); }, 900);
   }
 
   // ── DADOS TRIMESTRAIS (Acumulado Trimestral) ────────────────────
@@ -3894,10 +3897,7 @@ function changeMonth(){
   url.searchParams.set('month', newMonth);
   window.history.pushState({month: newMonth}, '', url);
 
-  // 3. LIMPAR localStorage do mês ANTIGO para evitar cache sujo
-  localStorage.removeItem(`dados_${oldMonth}`);
-  localStorage.removeItem(`riosulense_clients_${oldMonth}`);
-  localStorage.removeItem(`dados_resultado_${oldMonth}`);
+  // 3. (Nada é apagado do mês antigo: ele continua salvo neste navegador e na nuvem.)
 
   // 4. Restaura BASE para valores padrão
   for(let i = 0; i < BASE.length; i++) {
@@ -3922,6 +3922,11 @@ function changeMonth(){
   // 6. Renderiza inputs (agora com valores padrão de BASE) e carrega o que
   //    já estiver salvo neste navegador para o mês novo — SEMPRE, como base,
   //    para nunca depender só do Supabase respondendo a tempo.
+  // Zera os campos na tela ANTES de reconstruir: renderEditTable() relê os
+  // inputs para BASE, e sem isso os números do mês anterior "grudavam" no mês novo.
+  BASE.forEach((r,i)=>{
+    ['meta','real','prev','car'].forEach(k=>{ const el=$('i-'+k+'-'+i); if(el) el.value = fmtN(BASE_DEFAULT[i][k]); });
+  });
   renderEditTable();
   loadData();
   loadClientsData();
@@ -3936,6 +3941,7 @@ function changeMonth(){
   console.log('🔄 Tentando carregar dados para:', mesSupabase);
 
   carregarDadosSupabase(mesSupabase).then(dadosSupabase => {
+    if (currentMonth !== newMonth) return;   // trocou de mês de novo: ignora resposta atrasada
     const baseAtualizado = mapearDadosSupabase(dadosSupabase);
     if (baseAtualizado && baseAtualizado.length){
       baseAtualizado.forEach(rOnline=>{
