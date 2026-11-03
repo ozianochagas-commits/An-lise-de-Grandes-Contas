@@ -1735,15 +1735,19 @@ try{
         <div id="plano-import-controls" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap;">
           <div style="flex:1;min-width:220px;">
             <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">🔍 Filtro de Período:</label>
-            <select id="plano-trimestre-filter" onchange="applyPlanoFilter()" style="width:100%;margin-top:6px;padding:8px 12px;border:2px solid #E0E0E0;border-radius:7px;font-size:11px;font-weight:600;outline:none;cursor:pointer;">
-              <option value="">Todos os períodos (trimestral e semestral)</option>
-              <option value="1">1º Trimestre</option>
-              <option value="2">2º Trimestre</option>
-              <option value="3">3º Trimestre</option>
-              <option value="4">4º Trimestre</option>
-              <option value="S1">1º Semestre</option>
-              <option value="S2">2º Semestre</option>
-            </select>
+            <div id="plano-periodo-multi" style="position:relative;margin-top:6px;">
+              <button type="button" id="plano-periodo-btn" onclick="togglePeriodoMenu(event)" style="width:100%;text-align:left;padding:8px 12px;border:2px solid #E0E0E0;border-radius:7px;font-size:11px;font-weight:600;background:#fff;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;"><span id="plano-periodo-txt">Todos os períodos (trimestral e semestral)</span><span style="font-size:10px;">▼</span></button>
+              <div id="plano-periodo-menu" style="display:none;position:absolute;z-index:200;left:0;right:0;top:100%;margin-top:2px;background:#fff;border:2px solid #E0E0E0;border-radius:7px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:6px 4px;">
+                <label style="display:flex;gap:8px;align-items:center;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;border-bottom:1px solid #eee;"><input type="checkbox" id="pp-todos" onchange="periodoTodos(this)" checked style="width:16px;height:16px;"> Todos os períodos</label>
+                <label style="display:flex;gap:8px;align-items:center;padding:7px 10px;font-size:12px;cursor:pointer;"><input type="checkbox" class="pp" value="1" onchange="periodoMudou()" style="width:16px;height:16px;"> 1º Trimestre</label>
+                <label style="display:flex;gap:8px;align-items:center;padding:7px 10px;font-size:12px;cursor:pointer;"><input type="checkbox" class="pp" value="2" onchange="periodoMudou()" style="width:16px;height:16px;"> 2º Trimestre</label>
+                <label style="display:flex;gap:8px;align-items:center;padding:7px 10px;font-size:12px;cursor:pointer;"><input type="checkbox" class="pp" value="3" onchange="periodoMudou()" style="width:16px;height:16px;"> 3º Trimestre</label>
+                <label style="display:flex;gap:8px;align-items:center;padding:7px 10px;font-size:12px;cursor:pointer;"><input type="checkbox" class="pp" value="4" onchange="periodoMudou()" style="width:16px;height:16px;"> 4º Trimestre</label>
+                <label style="display:flex;gap:8px;align-items:center;padding:7px 10px;font-size:12px;cursor:pointer;border-top:1px solid #eee;"><input type="checkbox" class="pp" value="S1" onchange="periodoMudou()" style="width:16px;height:16px;"> 1º Semestre</label>
+                <label style="display:flex;gap:8px;align-items:center;padding:7px 10px;font-size:12px;cursor:pointer;"><input type="checkbox" class="pp" value="S2" onchange="periodoMudou()" style="width:16px;height:16px;"> 2º Semestre</label>
+              </div>
+              <input type="hidden" id="plano-trimestre-filter" value="">
+            </div>
           </div>
           <div style="flex:1;min-width:220px;">
             <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">👤 Buscar cliente:</label>
@@ -7175,11 +7179,42 @@ function vendaFilialInativos(cod, mesesAb){
 // Filtro de período do Plano: '' = todos; '1'..'4' = trimestre; 'S1'/'S2' = semestre
 function planoNoPeriodoFiltro(plano, filtro){
   if (!filtro) return true;
+  if (String(filtro).indexOf(',')!==-1) return String(filtro).split(',').some(f => planoNoPeriodoFiltro(plano, f));
   const periodo = String(plano.periodo || '').toUpperCase();
   if (/^S\d$/.test(filtro)) return periodo === 'SEMESTRAL' && String(plano.periodoNum || '') === filtro.slice(1);
   return periodo !== 'SEMESTRAL' && String(plano.trimestre || plano.periodoNum || '') === filtro;
 }
 
+/* Seletor de VÁRIOS períodos (caixinhas). O valor fica em #plano-trimestre-filter como lista: "1,3,S1" (vazio = todos). */
+function periodoRotulo(csv){
+  if(!csv) return 'Todos os períodos (trimestral e semestral)';
+  const nome={'1':'1º Tri','2':'2º Tri','3':'3º Tri','4':'4º Tri','S1':'1º Sem','S2':'2º Sem'};
+  return csv.split(',').map(x=>nome[x]||x).join(' + ');
+}
+function periodoMudou(){
+  const marcados=Array.from(document.querySelectorAll('#plano-periodo-menu .pp:checked')).map(c=>c.value);
+  const todos=document.getElementById('pp-todos'); if(todos) todos.checked=!marcados.length;
+  const csv=marcados.join(',');
+  document.getElementById('plano-trimestre-filter').value=csv;
+  document.getElementById('plano-periodo-txt').textContent=periodoRotulo(csv);
+  applyPlanoFilter();
+}
+function periodoTodos(el){
+  if(el.checked){ document.querySelectorAll('#plano-periodo-menu .pp').forEach(c=>c.checked=false); periodoMudou(); }
+  else el.checked=true;   // "Todos" só desmarca ao escolher algum período
+}
+function periodoDefinir(csv){
+  const lista=String(csv||'').split(',').filter(Boolean);
+  document.querySelectorAll('#plano-periodo-menu .pp').forEach(c=>c.checked=lista.includes(c.value));
+  const todos=document.getElementById('pp-todos'); if(todos) todos.checked=!lista.length;
+  document.getElementById('plano-trimestre-filter').value=lista.join(',');
+  document.getElementById('plano-periodo-txt').textContent=periodoRotulo(lista.join(','));
+}
+function togglePeriodoMenu(e){
+  if(e) e.stopPropagation();
+  const m=document.getElementById('plano-periodo-menu'); m.style.display=m.style.display==='none'?'block':'none';
+}
+document.addEventListener('click',function(e){ const w=document.getElementById('plano-periodo-multi'); if(w&&!w.contains(e.target)){ const m=document.getElementById('plano-periodo-menu'); if(m) m.style.display='none'; } });
 function applyPlanoFilter(){
   const repSelect = $('plano-rep-select');
   // Só representantes da região do usuário
@@ -8504,7 +8539,7 @@ async function initDashboard() {
       }
       if(trimParam) {
         const trimSelect = $('plano-trimestre-filter');
-        if(trimSelect) trimSelect.value = trimParam;
+        if(trimSelect) periodoDefinir(trimParam);
       }
 
       // Aplicar filtro
