@@ -251,6 +251,9 @@
   .page{display:none;padding:24px 32px;max-width:1440px;margin:0 auto;}
   .page.active{display:block;}
   /* Atualizou a página: abre direto na seção em que estava (o atributo sai assim que o sistema termina de carregar) */
+  html.carregando-plano{background:#1c1c1c !important}
+  html.carregando-plano body{visibility:hidden}
+  html.carregando-plano::after{content:"📊  Carregando dados...";position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font:800 16px Arial,sans-serif;z-index:99999}
   html[data-secao] .page{display:none;}
   html[data-secao="dashboard"] #page-dashboard{display:block;}
   html[data-secao="previsoes"] #page-previsoes{display:block;}
@@ -1078,7 +1081,12 @@ try{
   var __sec = sessionStorage.getItem('secao_atual');
   if(__sec && /^[a-z0-9]+$/.test(__sec) && !/[#&](s|b|d)=|[?&]view=/.test(location.hash + location.search)) document.documentElement.setAttribute('data-secao', __sec);
   // Link do Plano de Negócio (?view=plano...): já abre na tela do Plano, sem mostrar o Dashboard vazio enquanto carrega
-  if(/[?&]view=plano(&|$)/.test(location.search)) document.documentElement.setAttribute('data-secao', 'plano');
+  if(/[?&]view=plano(&|$)/.test(location.search)){
+    document.documentElement.setAttribute('data-secao', 'plano');
+    // tela de "Carregando dados..." até o Plano estar pronto (evita piscar Dashboard/"Importar planilha" durante o carregamento)
+    document.documentElement.classList.add('carregando-plano');
+    setTimeout(function(){ document.documentElement.classList.remove('carregando-plano'); }, 20000);   // segurança
+  }
 }catch(e){}
 </script>
 <style id="mobBanner">#mobBanner{display:none}@media(max-width:700px){#mobBanner{display:flex;position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:#FE5000;color:#fff;border-radius:14px;padding:14px 16px;font:700 16px system-ui,sans-serif;text-decoration:none;align-items:center;justify-content:space-between;box-shadow:0 4px 16px rgba(0,0,0,.3)}}</style><style id="ocultaRodape">/* rodapé repetido/quebrado ("Dashboard RIOSULENSE … nbsp;") escondido na tela; continua disponível na impressão */
@@ -8662,6 +8670,9 @@ async function initDashboard() {
         if(trimSelect) periodoDefinir(trimParam);
       }
 
+      // Garante que a tela de resultados (e não "Importar planilha") esteja visível quando há dados
+      try{ mostrarPlanoCarregado(); }catch(e){}
+
       // Aplicar filtro
       applyPlanoFilter();
 
@@ -8669,6 +8680,8 @@ async function initDashboard() {
       if(urlParams.get('ro') === '1') {
         ativarPlanoSomenteLeitura();
       }
+      // Pronto: tira a tela de "Carregando dados..."
+      document.documentElement.classList.remove('carregando-plano');
     }, 100);
   }
 }
