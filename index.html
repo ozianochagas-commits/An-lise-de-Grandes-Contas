@@ -7748,7 +7748,7 @@ function exportPlanoPDF(){
     const c = pagina.cloneNode(true);
     c.classList.add('active'); c.style.display='block';
     // tira o que é só de manejo (importar, trocar/excluir representante, botões, menus)
-    ['plano-import-area','plano-rep-bar','plano-link-status','plano-periodo-menu'].forEach(id=>{ const e=c.querySelector('#'+id); if(e) e.remove(); });
+    ['plano-import-area','plano-rep-bar','plano-link-status','plano-periodo-menu','plano-outras-regioes-box'].forEach(id=>{ const e=c.querySelector('#'+id); if(e) e.remove(); });
     c.querySelectorAll('button,input[type=file],.pdf-btn,.reset-btn').forEach(e=>e.remove());
     // filtros viram texto fixo (período e busca como estão na tela)
     const ctrl = c.querySelector('#plano-import-controls');
