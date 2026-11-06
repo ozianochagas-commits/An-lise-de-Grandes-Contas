@@ -5939,6 +5939,16 @@ async function parsePlanoPlanilha(file){
         let secaoAtual = null;
         let representantePrevio = ''; // Guardar representante da seção anterior
         let objetivoColIndex = 4; // Coluna padrão para objetivo (coluna E, índice 4)
+        const aplicarDescSecao = sec => {
+          if (!sec || !sec._desc) return;
+          (sec.grupos || []).forEach(g => {
+            let d = sec._desc[String(g.codCli)];
+            if (d === undefined) { const c = (g.clientes || []).find(x => sec._desc[String(x.codCli)] !== undefined); if (c) d = sec._desc[String(c.codCli)]; }
+            if (d !== undefined) g.desc = d;
+          });
+          delete sec._desc;
+        };
+        let descColIndex = -1;    // coluna "DESC. NEGÓCIO" (desconto do plano), quando existir
         let totalGrupoColIndex = -1; // Coluna "Total Grupo" (soma já consolidada das filiais), se existir
         let ultimoAgrupador = null;  // {cod, nome} do último "- Agrupador" lido (para filiais fora da lista)
         const nomeBase = (v) => String(v || '').replace(/\s*-?\s*Agrupador\s*$/i, '')
@@ -6068,6 +6078,7 @@ async function parsePlanoPlanilha(file){
           if (isSecaoHeader) {
             // Salvar seção anterior
             if (secaoAtual) {
+              aplicarDescSecao(secaoAtual);
               secoes.push(secaoAtual);
             }
 
@@ -6152,6 +6163,10 @@ async function parsePlanoPlanilha(file){
           if (firstCellVal === 'UF') {
             // É cabeçalho - detectar coluna de objetivo
             // Procurar por "Objetivo", "Meta", "Falta", etc
+            descColIndex = -1;
+            for (let col = 3; col <= 14; col++) {   // (o laço abaixo para no objetivo; a coluna DESC. NEGÓCIO vem depois)
+              if (getCellValue(cellMap, col).toUpperCase().includes('DESC')) { descColIndex = col; break; }
+            }
             for (let col = 3; col <= 10; col++) {
               const headerVal = getCellValue(cellMap, col).toUpperCase();
               if (headerVal.includes('TOTAL') && headerVal.includes('GRUPO')) {
@@ -6190,6 +6205,10 @@ async function parsePlanoPlanilha(file){
           const uf = getCellValue(cellMap, 0).trim();
           const codCli = getCellValue(cellMap, 1).trim();
           const cliente = getCellValue(cellMap, 2).trim();
+          if (descColIndex >= 0 && secaoAtual) {   // desconto do negócio (ex.: 5%) por cliente
+            const dv = parseFloat(String(getCellValue(cellMap, descColIndex)).replace('%','').replace(',','.'));
+            if (!isNaN(dv)) { (secaoAtual._desc = secaoAtual._desc || {})[codCli] = dv > 1 ? dv / 100 : dv; }
+          }
           const total = parseFloat(getCellValue(cellMap, 3)) || 0;
           const objetivo = parseFloat(getCellValue(cellMap, objetivoColIndex)) || 0;
           const falta = objetivo - total;
@@ -6357,6 +6376,7 @@ async function parsePlanoPlanilha(file){
 
         // Salvar última seção
         if (secaoAtual) {
+          aplicarDescSecao(secaoAtual);
           secoes.push(secaoAtual);
         }
 
@@ -7742,42 +7762,87 @@ function gerarLinkCompartilharPlano(){
 }
 
 function exportPlanoPDF(){
-  // Exporta a tela do Plano de Negócio COMO ELA ESTÁ (mesmo visual): cabeçalho escuro, filtros,
-  // resumo do cliente, tabela (linhas abertas/fechadas como estão) e totais.
+  // PDF no MESMO formato da planilha de importação: uma faixa laranja com o título de cada plano
+  // ("Planos - 4º TRIMESTRE", "Planos Semestrais: Julho à Dezembro"), cabeçalho azul-petróleo e os grupos
+  // com Total/Objetivo/Falta/Resultado mesclados. Sai o que está filtrado na tela (representante, período, cliente).
   try{
-    const pagina = $('page-plano'), tb = $('plano-tbody');
-    if(!pagina || !tb || !tb.children.length){ alert('Não há dados do Plano de Negócio na tela para exportar.'); return; }
     const esc = t => String(t==null?'':t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-    const periodo = (($('plano-periodo-txt')||{}).textContent||'Todos os períodos').trim();
-    const busca = (($('plano-cliente-filter')||{}).value||'').trim();
-    const c = pagina.cloneNode(true);
-    c.classList.add('active'); c.style.display='block';
-    // tira o que é só de manejo (importar, trocar/excluir representante, botões, menus)
-    ['plano-import-area','plano-rep-bar','plano-link-status','plano-periodo-menu','plano-outras-regioes-box'].forEach(id=>{ const e=c.querySelector('#'+id); if(e) e.remove(); });
-    c.querySelectorAll('button,input[type=file],.pdf-btn,.reset-btn').forEach(e=>e.remove());
-    // filtros viram texto fixo (período e busca como estão na tela)
-    const ctrl = c.querySelector('#plano-import-controls');
-    if(ctrl){
-      ctrl.innerHTML = '<div style="flex:1;min-width:220px;"><div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">🔍 Filtro de Período:</div><div style="margin-top:6px;padding:8px 12px;border:2px solid #E0E0E0;border-radius:6px;font-size:12px;font-weight:700;background:#fff">'+esc(periodo)+'</div></div>'
-        + (busca ? '<div style="flex:1;min-width:220px;"><div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">👤 Buscar Cliente:</div><div style="margin-top:6px;padding:8px 12px;border:2px solid #E0E0E0;border-radius:6px;font-size:12px;font-weight:700;background:#fff">'+esc(busca)+'</div></div>' : '');
-    }
-    const painel = c.querySelector('#plano-summary-panel'); if(painel){ painel.style.position='static'; }
-    { const q=c.querySelector('#plano-qtd-planos'); const caixa=q&&q.parentElement&&q.parentElement.parentElement; if(caixa) caixa.remove(); }   // PDF sem "Total de planos / Planos batidos"
-    c.querySelectorAll('[id]').forEach(e => e.removeAttribute('id'));
-    const estilos = Array.from(document.querySelectorAll('style')).map(e => e.textContent).join('\n');
-    const html = '<!doctype html><html><head><meta charset="utf-8"><title>Plano de Negócio</title><style>'+estilos+`
-      @page{size:A4 landscape;margin:8mm}
-      html,body{background:#F4F4F4 !important;margin:0;padding:0}
-      body{font-family:Arial,Helvetica,sans-serif;padding:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-      .page{display:block !important}
-      .twrap{overflow:visible !important}
-      tr{page-break-inside:avoid}
-      #plano-summary-panel,.phero{break-inside:avoid}
-    </style></head><body>`+c.outerHTML+`</body></html>`;
+    const selRep = (($('plano-rep-select')||{}).value || '');
+    const filtroPer = (($('plano-trimestre-filter')||{}).value || '');
+    const termo = normalizePlanoText(($('plano-cliente-filter')||{}).value || '');
+    const bate = o => o && (normalizePlanoText(o.nome || o.cliente).includes(termo) || normalizePlanoText(o.codCli).includes(termo));
+    const planos = [];
+    const reps = selRep ? [selRep] : Object.keys(PLANO_BY_REP).filter(repNaRegiao);
+    reps.forEach(rep => (PLANO_BY_REP[rep] || []).forEach(pl => {
+      if (!planoNoPeriodoFiltro(pl, filtroPer)) return;
+      let grupos = pl.grupos || [];
+      if (termo) grupos = grupos.filter(g => bate(g) || (g.clientes || []).some(bate));
+      if (grupos.length) planos.push({ rep, periodo: String(pl.periodo || 'TRIMESTRAL').toUpperCase(), num: String(pl.periodoNum || pl.trimestre || ''), grupos });
+    }));
+    if (!planos.length){ alert('Não há dados do Plano de Negócio na tela para exportar.'); return; }
+    planos.sort((a, b) => (a.periodo === b.periodo ? 0 : (a.periodo === 'TRIMESTRAL' ? -1 : 1)) || a.num.localeCompare(b.num) || a.rep.localeCompare(b.rep));
+
+    const tituloDe = pl => pl.periodo === 'SEMESTRAL'
+      ? 'Planos Semestrais: ' + (pl.num === '1' ? 'Janeiro à Junho' : (pl.num === '2' ? 'Julho à Dezembro' : (pl.num ? pl.num + 'º Semestre' : '')))
+      : 'Planos - ' + (pl.num ? pl.num + 'º ' : '') + 'TRIMESTRE';
+    const pct = v => Math.round((Number(v) || 0) * 100) + '%';
+    const varios = new Set(planos.map(p => p.rep)).size > 1;
+
+    let corpo = '';
+    planos.forEach(pl => {
+      // consolida grupos repetidos (mesmo código) e desfaz o grupo "0000" (clientes avulsos)
+      const mapa = new Map();
+      pl.grupos.flatMap(g => String(g.codCli ?? '').trim() === '0000'
+        ? (g.clientes || []).map(c => ({ nome: c.cliente, uf: c.uf, codCli: c.codCli, total: Number(c.total) || 0, objetivo: Number(c.objetivo) || 0, clientes: [c] }))
+        : [g]).forEach(g => {
+          const k = String(g.codCli ?? '') + '|' + (g.nome || '');
+          if (!mapa.has(k)) mapa.set(k, { ...g, total: Number(g.total) || 0, objetivo: Number(g.objetivo) || 0, clientes: [...(g.clientes || [])] });
+          else { const e = mapa.get(k); e.total += Number(g.total) || 0; e.objetivo += Number(g.objetivo) || 0; e.clientes.push(...(g.clientes || [])); }
+        });
+      const grupos = [...mapa.values()];
+      const temDesc = grupos.some(g => g.desc !== undefined && g.desc !== null);
+      let totT = 0, totO = 0, bandas = 0, linhas = '';
+      grupos.forEach(g => {
+        const obj = Number(g.objetivo) || 0, tot = Number(g.total) || 0, falta = obj - tot, res = obj > 0 ? tot / obj : 0;
+        totT += tot; totO += obj;
+        const clientes = (g.clientes && g.clientes.length) ? g.clientes : [{ uf: g.uf, codCli: g.codCli, cliente: g.nome }];
+        const bg = (bandas++ % 2 === 0) ? '#FBE3D4' : '#F6C9AB';
+        const n = clientes.length;
+        const rs = n > 1 ? ' rowspan="' + n + '"' : '';
+        const corRes = res >= 1 ? 'background:#C6EFCE;color:#006100' : 'background:#FFC7CE;color:#9C0006';
+        clientes.forEach((c, i) => {
+          linhas += '<tr style="background:' + bg + '">'
+            + '<td class="c">' + esc(c.uf || g.uf || '') + '</td><td class="c">' + esc(c.codCli || '') + '</td><td class="l">' + esc(c.cliente || g.nome || '') + '</td>'
+            + (i === 0 ? '<td class="m"' + rs + '>' + formatMoney(tot) + '</td><td class="m ob"' + rs + '>' + formatMoney(obj) + '</td><td class="m"' + rs + '>' + formatMoney(falta) + '</td><td class="m rs" style="' + corRes + '"' + rs + '>' + pct(res) + '</td>'
+              + (temDesc ? '<td class="c"' + rs + '>' + (g.desc !== undefined && g.desc !== null ? pct(g.desc) : '') + '</td>' : '') : '')
+            + '</tr>';
+        });
+      });
+      const totRes = totO > 0 ? totT / totO : 0;
+      linhas += '<tr class="tt"><td colspan="3" class="l">TOTAL' + (varios ? ' — ' + esc(pl.rep) : '') + '</td><td class="m">' + formatMoney(totT) + '</td><td class="m">' + formatMoney(totO) + '</td><td class="m">' + formatMoney(totO - totT) + '</td><td class="m">' + pct(totRes) + '</td>' + (temDesc ? '<td></td>' : '') + '</tr>';
+      corpo += '<div class="sec"><div class="faixa">' + esc(tituloDe(pl)) + (varios ? ' — ' + esc(pl.rep) : '') + '</div>'
+        + '<table><thead><tr><th style="width:6%">UF</th><th style="width:8%">CodCli</th><th>Cliente</th><th style="width:14%">Total Grupo</th><th style="width:15%">Objetivo ' + (pl.periodo === 'SEMESTRAL' ? 'SEMESTRAL' : 'TRIMESTRAL') + '</th><th style="width:14%">FALTA R$</th><th style="width:10%">RESULTADO %</th>' + (temDesc ? '<th style="width:8%">DESC. NEGÓCIO</th>' : '') + '</tr></thead><tbody>' + linhas + '</tbody></table></div>';
+    });
+
+    const repTxt = selRep || 'Todos os Representantes';
+    const perTxt = (($('plano-periodo-txt')||{}).textContent || 'Todos os períodos').trim();
+    const buscaTxt = (($('plano-cliente-filter')||{}).value || '').trim();
+    const agora = new Date();
+    const html = '<!doctype html><html><head><meta charset="utf-8"><title>Plano de Negócio</title><style>'
+      + '@page{size:A4 portrait;margin:10mm}'
+      + 'html,body{margin:0;background:#fff}body{font-family:Calibri,Arial,Helvetica,sans-serif;color:#222;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+      + '.topo{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;border-bottom:2px solid #FE5000;padding-bottom:4px;font-size:11px}.topo b{font-size:14px}'
+      + '.sec{margin-bottom:16px;break-inside:auto}.faixa{background:#FF6A00;color:#000;font-family:"Courier New",monospace;font-weight:bold;font-style:italic;text-align:center;font-size:13px;padding:5px}'
+      + 'table{width:100%;border-collapse:collapse;font-size:11px}th{background:#0F3446;color:#fff;font-weight:600;padding:6px 4px;border:1px solid #0b2531;text-align:center}'
+      + 'td{border:1px solid #0F3446;padding:3px 6px;vertical-align:middle}td.c{text-align:center}td.l{text-align:left}td.m{text-align:center;font-size:12px}td.ob{font-weight:bold;color:#1F3A5F}td.rs{font-weight:bold}'
+      + 'tr{break-inside:avoid}thead{display:table-header-group}tr.tt td{background:#0F3446;color:#fff;font-weight:bold}'
+      + '</style></head><body>'
+      + '<div class="topo"><div><b>Plano de Negócio</b> — ' + esc(repTxt) + '<br>Período: ' + esc(perTxt) + (buscaTxt ? ' · Cliente: ' + esc(buscaTxt) : '') + '</div><div>Gerado em ' + esc(agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})) + '</div></div>'
+      + corpo + '</body></html>';
     const w = window.open('', '_blank');
     if(!w){ alert('O navegador bloqueou a janela de exportação. Permita pop-ups para este site e clique em Exportar PDF de novo.'); return; }
     w.document.open(); w.document.write(html); w.document.close();
-    setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} }, 700);
+    setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} }, 500);
     if(typeof registrarAuditoria==='function') registrarAuditoria('Exportou PDF', 'Plano de Negócio');
   }catch(e){ console.error(e); alert('Não consegui gerar o PDF agora. Tente de novo.'); }
 }
