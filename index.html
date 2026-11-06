@@ -1077,6 +1077,8 @@
 try{
   var __sec = sessionStorage.getItem('secao_atual');
   if(__sec && /^[a-z0-9]+$/.test(__sec) && !/[#&](s|b|d)=|[?&]view=/.test(location.hash + location.search)) document.documentElement.setAttribute('data-secao', __sec);
+  // Link do Plano de Negócio (?view=plano...): já abre na tela do Plano, sem mostrar o Dashboard vazio enquanto carrega
+  if(/[?&]view=plano(&|$)/.test(location.search)) document.documentElement.setAttribute('data-secao', 'plano');
 }catch(e){}
 </script>
 <style id="mobBanner">#mobBanner{display:none}@media(max-width:700px){#mobBanner{display:flex;position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:#FE5000;color:#fff;border-radius:14px;padding:14px 16px;font:700 16px system-ui,sans-serif;text-decoration:none;align-items:center;justify-content:space-between;box-shadow:0 4px 16px rgba(0,0,0,.3)}}</style><style id="ocultaRodape">/* rodapé repetido/quebrado ("Dashboard RIOSULENSE … nbsp;") escondido na tela; continua disponível na impressão */
@@ -1176,7 +1178,7 @@ try{
     <option value="cliente360">🎯 Cliente 360</option>
     <option value="transporte">🚚 Gestão de Transporte</option>
   </select>
-  <script>try{var __s=sessionStorage.getItem('secao_atual'),__n=document.getElementById('nav-select');if(__s&&__n&&document.documentElement.hasAttribute('data-secao'))__n.value=__s;}catch(e){}</script>
+  <script>try{var __s=sessionStorage.getItem('secao_atual'),__n=document.getElementById('nav-select');if(/[?&]view=plano(&|$)/.test(location.search))__s='plano';if(__s&&__n&&document.documentElement.hasAttribute('data-secao'))__n.value=__s;}catch(e){}</script>
   <div class="usuario-box" id="usuario-box">
     <span class="nav-label">👤 Usuário:</span>
     <select id="usuario-select" onchange="trocarUsuarioSistema(this.value)">
@@ -8648,6 +8650,7 @@ async function initDashboard() {
       // Abrir aba Plano
       const planoTab = Array.from(document.querySelectorAll('.tab')).find(t => t.textContent.includes('Plano de Negócio'));
       if(planoTab) planoTab.click();
+      if(!document.querySelector('#page-plano.active')) { try{ navFromSelect('plano'); }catch(e){} }   // garantia
 
       // Aplicar filtros se houver
       if(repParam) {
