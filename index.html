@@ -7733,7 +7733,43 @@ function gerarLinkCompartilharPlano(){
 }
 
 function exportPlanoPDF(){
-  alert('📥 Exportação em PDF será implementada em breve.');
+  // Exporta a tela do Plano de Negócio COMO ELA ESTÁ (mesmo visual): cabeçalho escuro, filtros,
+  // resumo do cliente, tabela (linhas abertas/fechadas como estão) e totais.
+  try{
+    const pagina = $('page-plano'), tb = $('plano-tbody');
+    if(!pagina || !tb || !tb.children.length){ alert('Não há dados do Plano de Negócio na tela para exportar.'); return; }
+    const esc = t => String(t==null?'':t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const periodo = (($('plano-periodo-txt')||{}).textContent||'Todos os períodos').trim();
+    const busca = (($('plano-cliente-filter')||{}).value||'').trim();
+    const c = pagina.cloneNode(true);
+    c.classList.add('active'); c.style.display='block';
+    // tira o que é só de manejo (importar, trocar/excluir representante, botões, menus)
+    ['plano-import-area','plano-rep-bar','plano-link-status','plano-periodo-menu'].forEach(id=>{ const e=c.querySelector('#'+id); if(e) e.remove(); });
+    c.querySelectorAll('button,input[type=file],.pdf-btn,.reset-btn').forEach(e=>e.remove());
+    // filtros viram texto fixo (período e busca como estão na tela)
+    const ctrl = c.querySelector('#plano-import-controls');
+    if(ctrl){
+      ctrl.innerHTML = '<div style="flex:1;min-width:220px;"><div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">🔍 Filtro de Período:</div><div style="margin-top:6px;padding:8px 12px;border:2px solid #E0E0E0;border-radius:6px;font-size:12px;font-weight:700;background:#fff">'+esc(periodo)+'</div></div>'
+        + (busca ? '<div style="flex:1;min-width:220px;"><div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">👤 Buscar Cliente:</div><div style="margin-top:6px;padding:8px 12px;border:2px solid #E0E0E0;border-radius:6px;font-size:12px;font-weight:700;background:#fff">'+esc(busca)+'</div></div>' : '');
+    }
+    const painel = c.querySelector('#plano-summary-panel'); if(painel){ painel.style.position='static'; }
+    c.querySelectorAll('[id]').forEach(e => e.removeAttribute('id'));
+    const estilos = Array.from(document.querySelectorAll('style')).map(e => e.textContent).join('\n');
+    const html = '<!doctype html><html><head><meta charset="utf-8"><title>Plano de Negócio</title><style>'+estilos+`
+      @page{size:A4 landscape;margin:8mm}
+      html,body{background:#F4F4F4 !important;margin:0;padding:0}
+      body{font-family:Arial,Helvetica,sans-serif;padding:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .page{display:block !important}
+      .twrap{overflow:visible !important}
+      tr{page-break-inside:avoid}
+      #plano-summary-panel,.phero{break-inside:avoid}
+    </style></head><body>`+c.outerHTML+`</body></html>`;
+    const w = window.open('', '_blank');
+    if(!w){ alert('O navegador bloqueou a janela de exportação. Permita pop-ups para este site e clique em Exportar PDF de novo.'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+    setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} }, 700);
+    if(typeof registrarAuditoria==='function') registrarAuditoria('Exportou PDF', 'Plano de Negócio');
+  }catch(e){ console.error(e); alert('Não consegui gerar o PDF agora. Tente de novo.'); }
 }
 
 function clearPlanoImport(){
