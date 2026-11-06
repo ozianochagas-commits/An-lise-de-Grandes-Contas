@@ -385,8 +385,10 @@ async function salvarViagem(){
 }
 async function excluirViagem(id){
   if(!confirm('Excluir esta viagem?')) return;
+  const alvoEx=viagens.find(x=>x.id===id);
   viagens=viagens.filter(x=>x.id!==id); gravaVia(); fecharSheet(); renderTudo();
-  try{ await sb('agenda_viagens?id=eq.'+id,{method:'DELETE',headers:{Prefer:'return=minimal'}}); }catch(e){ console.error(e); }
+  // exclusão "mansa": fica na nuvem como Excluida (lápide), nada é apagado de verdade
+  if(alvoEx){ alvoEx.status='Excluida'; alvoEx._syncEm=new Date().toISOString(); await enviar('agenda_viagens',[alvoEx],viagemParaLinha); }
 }
 
 /* ---------- Peças: consulta de estoque por loja, com foto (só Samuel) ---------- */
