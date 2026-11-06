@@ -6047,7 +6047,7 @@ async function parsePlanoPlanilha(file){
             .replace(/[\u0300-\u036f]/g, '')
             .toUpperCase();
 
-          const temPeriodo = tituloNorm.includes('TRIMESTRE') || tituloNorm.includes('SEMESTRE');
+          const temPeriodo = /TRIMESTR|SEMESTR/.test(tituloNorm);   // inclui "Planos Semestrais: Julho à Dezembro" / "Trimestrais"
           const temRepresentante = tituloNorm.includes('REPRESENTACOES') || tituloNorm.includes('PLANOS');
           // Formato 5: "(568) IG -  3º TRIMESTRE 2026  (RN, PB, PE, AL, SE)" — sem
           // "REPRESENTAÇÕES"/"PLANOS" no título, só o código entre parênteses e o período.
@@ -6074,7 +6074,7 @@ async function parsePlanoPlanilha(file){
             // Criar nova seção
             secaoAtual = {
               titulo: firstCellVal,
-              periodo: tituloNorm.includes('SEMESTRE') ? 'SEMESTRAL' : 'TRIMESTRAL',
+              periodo: tituloNorm.includes('SEMESTR') ? 'SEMESTRAL' : 'TRIMESTRAL',
               periodoNum: '', // nunca assumir 3º trimestre silenciosamente
               representante: '',
               grupos: [],
@@ -6082,12 +6082,19 @@ async function parsePlanoPlanilha(file){
             };
 
             // Extrair período aceitando "3º", "3°" ou "3 TRIMESTRE".
-            if (tituloNorm.includes('SEMESTRE')) {
-              const match = firstCellVal.match(/(\d+)\s*[º°]?\s*SEMESTRE/i);
-              secaoAtual.periodoNum = match ? match[1] : '';
-            } else if (tituloNorm.includes('TRIMESTRE')) {
-              const match = firstCellVal.match(/(\d+)\s*[º°]?\s*TRIMESTRE/i);
-              secaoAtual.periodoNum = match ? match[1] : '';
+            // Sem número no título ("Planos Semestrais: Julho à Dezembro"): vem do 1º mês citado
+            const mesTitulo = (() => {
+              const meses = ['JANEIRO','FEVEREIRO','MARCO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+              let melhor = -1, pos = 1e9;
+              meses.forEach((m, i) => { const k = tituloNorm.indexOf(m); if (k >= 0 && k < pos) { pos = k; melhor = i; } });
+              return melhor;
+            })();
+            if (tituloNorm.includes('SEMESTR')) {
+              const match = firstCellVal.match(/(\d+)\s*[º°]?\s*SEMESTR/i);
+              secaoAtual.periodoNum = match ? match[1] : (mesTitulo >= 0 ? String(mesTitulo < 6 ? 1 : 2) : '');
+            } else if (tituloNorm.includes('TRIMESTR')) {
+              const match = firstCellVal.match(/(\d+)\s*[º°]?\s*TRIMESTR/i);
+              secaoAtual.periodoNum = match ? match[1] : (mesTitulo >= 0 ? String(Math.floor(mesTitulo / 3) + 1) : '');
             } else if (periodoDaAba) {
               // título sem período: usa o do nome da aba ("Acompanhamento 3º TRI")
               secaoAtual.periodo = periodoDaAba.periodo;
