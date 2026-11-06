@@ -7725,8 +7725,19 @@ function renderPlanoTable(dados, dadosTotais){
 function buildPlanoShareUrl(){
   const repSelect = $('plano-rep-select');
   const trimestreFilter = $('plano-trimestre-filter');
-  const selectedRep = repSelect ? repSelect.value : '';
+  let selectedRep = repSelect ? repSelect.value : '';
   const selectedTrimestre = trimestreFilter ? trimestreFilter.value : '';
+  // Sem representante escolhido na tela do Plano, mas com UM só marcado no filtro do topo: usa esse
+  if (!selectedRep) {
+    try {
+      const marcados = Array.from(document.querySelectorAll('.rep-checkbox')).filter(cb => cb.checked);
+      const total = document.querySelectorAll('.rep-checkbox').length;
+      if (marcados.length === 1 && total > 1) {
+        const chave = normalizePlanoRep(BASE[parseInt(marcados[0].dataset.idx)].name);
+        if (chave && PLANO_BY_REP[chave]) selectedRep = chave;
+      }
+    } catch (e) {}
+  }
 
   const params = new URLSearchParams();
   params.set('view', 'plano');
@@ -8660,7 +8671,10 @@ async function initDashboard() {
       if(planoTab) planoTab.click();
       if(!document.querySelector('#page-plano.active')) { try{ navFromSelect('plano'); }catch(e){} }   // garantia
 
-      // Aplicar filtros se houver
+      // PRIMEIRO monta a tela de resultados (isso recria a lista de representantes e zera a escolha) …
+      try{ mostrarPlanoCarregado(); }catch(e){}
+
+      // … e só DEPOIS aplica o representante e o período do link
       if(repParam) {
         const repSelect = $('plano-rep-select');
         if(repSelect) repSelect.value = decodeURIComponent(repParam);
@@ -8670,11 +8684,8 @@ async function initDashboard() {
         if(trimSelect) periodoDefinir(trimParam);
       }
 
-      // Garante que a tela de resultados (e não "Importar planilha") esteja visível quando há dados
-      try{ mostrarPlanoCarregado(); }catch(e){}
-
-      // Aplicar filtro
-      applyPlanoFilter();
+      // Aplicar filtro (e o nome do representante no cabeçalho)
+      onPlanoRepChange();
 
       // Link desta visão (?ro=1): só vê esta tela, travada, sem editar nem ir para outras seções
       if(urlParams.get('ro') === '1') {
