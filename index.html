@@ -7697,9 +7697,8 @@ function buildPlanoShareUrl(){
     params.set('rep', encodeURIComponent(selectedRep));
   }
   if (selectedTrimestre) params.set('trim', selectedTrimestre);
-  // Este link é SÓ desta visão: leva também a busca de cliente e o mês, e abre sempre em somente-leitura
-  const buscaCli = (($('plano-cliente-filter')||{}).value || '').trim();
-  if (buscaCli) params.set('cli', encodeURIComponent(buscaCli));
+  // Link INDIVIDUAL do representante selecionado: leva o representante, o período e o mês,
+  // e abre sempre em somente-leitura (a busca de cliente não vai no link).
   if (typeof currentMonth === 'string' && currentMonth) params.set('month', currentMonth);
   params.set('ro', '1');
 
@@ -7708,7 +7707,6 @@ function buildPlanoShareUrl(){
     url: baseUrl + '?' + params.toString(),
     repLabel: (selectedRep || 'Todos os Representantes')
       + (selectedTrimestre ? ' · ' + ((($('plano-periodo-txt')||{}).textContent)||'').trim() : '')
-      + (buscaCli ? ' · cliente ' + buscaCli : '')
   };
 }
 
@@ -8588,9 +8586,6 @@ async function initDashboard() {
         if(trimSelect) periodoDefinir(trimParam);
       }
 
-      const cliParam = urlParams.get('cli');
-      if(cliParam){ const cf = $('plano-cliente-filter'); if(cf) cf.value = decodeURIComponent(cliParam); }
-
       // Aplicar filtro
       applyPlanoFilter();
 
@@ -8620,15 +8615,12 @@ function ativarPlanoSomenteLeitura(){
   const linkBtn = document.querySelector('#plano-summary-panel button[onclick="copyPlanoLink()"]');
   if(linkBtn) linkBtn.style.display = 'none';
 
-  // Trava a visão: sem trocar de seção, mês, período, busca nem excluir/importar
+  // Trava a visão: sem trocar de seção, de mês ou de representante, nem excluir/importar (período e busca de cliente continuam livres)
   document.querySelectorAll('.tab').forEach(t => { t.style.display = 'none'; });
   ['nav-bar','toolbar'].forEach(c => { const e = document.querySelector('.'+c); if(e) e.style.display = 'none'; });
   const tabsRow = $('tabs-row'); if(tabsRow) tabsRow.style.display = 'none';
   const btnShare = $('btn-share'); if(btnShare) btnShare.style.display = 'none';
   const selMes = $('month-selector'); if(selMes){ selMes.disabled = true; selMes.style.cursor = 'not-allowed'; }
-  const pbtn = $('plano-periodo-btn'); if(pbtn){ pbtn.disabled = true; pbtn.style.cursor = 'not-allowed'; pbtn.onclick = null; }
-  const pmenu = $('plano-periodo-menu'); if(pmenu) pmenu.style.display = 'none';
-  const cbusca = $('plano-cliente-filter'); if(cbusca){ cbusca.readOnly = true; cbusca.style.cursor = 'not-allowed'; }
   const delBtn = $('plano-del-btn'); if(delBtn) delBtn.style.display = 'none';
   document.querySelectorAll('#plano-import-area').forEach(e => { e.style.display = 'none'; });
   window.__planoSomenteLeitura = true;
