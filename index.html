@@ -251,6 +251,29 @@
   .page{display:none;padding:24px 32px;max-width:1440px;margin:0 auto;}
   .page.active{display:block;}
   /* Atualizou a página: abre direto na seção em que estava (o atributo sai assim que o sistema termina de carregar) */
+  /* seletor de mês com calendário (mês + ano) */
+  #mes-picker{position:relative;display:inline-block}
+  #mes-btn{padding:6px 10px;border:2px solid white;border-radius:4px;background:var(--orange);color:white;font-weight:900;cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap}
+  #mes-btn:disabled{cursor:not-allowed;opacity:.9}
+  #mes-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:3000;background:#fff;color:#222;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.35);padding:12px;width:280px;max-width:92vw;text-align:left}
+  .mes-ano{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .mes-ano b{font-size:16px}
+  .mes-ano button{border:0;background:#f1f1f1;border-radius:6px;width:34px;height:30px;cursor:pointer;font-size:13px}
+  .mes-ano button:hover{background:#ddd}
+  .mes-grade{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .mes-grade button{border:1.5px solid #e4e4e4;background:#fff;border-radius:8px;padding:10px 0;font-size:13px;font-weight:700;cursor:pointer;color:#333;font-family:inherit}
+  .mes-grade button:hover{border-color:var(--orange)}
+  .mes-grade button.sel{background:var(--orange);color:#fff;border-color:var(--orange)}
+  .mes-grade button.hoje{box-shadow:inset 0 0 0 2px #1E7E34}
+  .mes-grade button.faixa{background:#FFE9DD;border-color:#FFD2B8}
+  .mes-atalhos{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .mes-atalhos button{border:1px solid #ddd;background:#f7f7f7;border-radius:12px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;color:#444;font-family:inherit}
+  .mes-atalhos button:hover{border-color:var(--orange);color:var(--orange)}
+  .mes-resumo{margin-top:8px;font-size:12px;font-weight:700;color:#1E7E34;min-height:16px}
+  .mes-ac{display:flex;align-items:center;justify-content:space-between;margin-top:8px;font-size:12px}
+  .mes-ac a{color:#1a73e8;text-decoration:none;font-weight:700}
+  .mes-ok{background:var(--orange);color:#fff;border:0;border-radius:6px;padding:7px 18px;font-weight:800;cursor:pointer;font-family:inherit}
+  .mes-dica{margin-top:6px;font-size:10.5px;color:#888}
   html.carregando-plano{background:#1c1c1c !important}
   html.carregando-plano body{visibility:hidden}
   html.carregando-plano::after{content:"📊  Carregando dados...";position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font:800 16px Arial,sans-serif;z-index:99999}
@@ -1105,6 +1128,7 @@ try{
   header [style*="font-size:10px"]{display:none}
   .hdate{text-align:right !important}
   #month-selector{font-size:12px !important;padding:5px 6px !important}
+  #mes-btn{font-size:12px !important;padding:5px 8px !important}
   /* barra de seção e usuário: grudada no topo, uma linha */
   .nav-bar{position:sticky;top:0;z-index:60;padding:6px 10px !important;gap:6px !important;flex-wrap:wrap}
   .nav-label{display:none !important}
@@ -1151,7 +1175,16 @@ try{
     </div>
   </div>
   <div class="hdate">
-    <select id="month-selector" onchange="changeMonth()" style="padding:6px;border:2px solid white;border-radius:4px;background:var(--orange);color:white;font-weight:900;cursor:pointer;font-size:12px;">
+    <div id="mes-picker"><button type="button" id="mes-btn" onclick="mesPickerAbrir(event)" aria-haspopup="true"><span id="mes-txt">Mês</span> <span class="mes-seta">▾</span></button>
+      <div id="mes-pop" style="display:none" onclick="event.stopPropagation()">
+        <div class="mes-ano"><button type="button" onclick="mesPickerAno(-1)" title="Ano anterior">◀</button><b id="mes-ano-txt">2026</b><button type="button" onclick="mesPickerAno(1)" title="Próximo ano">▶</button></div>
+        <div class="mes-grade" id="mes-grade"></div>
+        <div id="mes-atalhos" class="mes-atalhos"></div>
+        <div id="mes-resumo" class="mes-resumo"></div>
+        <div class="mes-ac"><button type="button" class="mes-ok" onclick="mesPickerAplicar()">Aplicar</button><a href="#" onclick="mesPickerHoje(event)">Mês atual</a></div>
+        <div class="mes-dica">Clique em um mês, ou em dois meses para ver o período.</div>
+      </div></div>
+    <select id="month-selector" onchange="changeMonth()" style="display:none;padding:6px;border:2px solid white;border-radius:4px;background:var(--orange);color:white;font-weight:900;cursor:pointer;font-size:12px;">
       <option value="2026-01">Janeiro 2026</option>
       <option value="2026-02">Fevereiro 2026</option>
       <option value="2026-03" selected>Março 2026</option>
@@ -2625,6 +2658,7 @@ function getTotalClientsPrevision(repIndex){
 }
 
 function saveClientsData(){
+  if(window.__periodo) return;   // período é só leitura
   const data = {};
   Object.keys(CLIENTS).forEach(idx => {
     data[idx] = CLIENTS[idx];
@@ -3899,6 +3933,99 @@ function exportPDF(){
 }
 
 // ── DATA AUTOMÁTICA ────────────────────────────────────────────
+// ── Seletor de mês/período com calendário (mês + ano) ──
+// Clique num mês = esse mês. Clique em dois meses = período (soma de Meta/Realizado; Cenário e Carteira do último mês).
+let _mesAno = 0, _pIni = null, _pFim = null;
+window.__periodo = null;
+const MESES_ABR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const mesAbr = k => { const p = String(k).split('-'); return (MESES_ABR[parseInt(p[1],10)-1] || '') + ' ' + p[0]; };
+function mesPickerAtualizar(){
+  const sel = $('month-selector'), btn = $('mes-btn'), txt = $('mes-txt'); if(!sel || !btn || !txt) return;
+  const nome = window.__periodo ? (mesAbr(window.__periodo.ini) + ' – ' + mesAbr(window.__periodo.fim)) : monthFullName(sel.value || currentMonth);
+  if(nome && txt.textContent !== nome) txt.textContent = nome;
+  btn.disabled = !!sel.disabled;
+}
+function mesPickerDesenhar(){
+  const hoje = new Date(), hojeKey = hoje.getFullYear() + '-' + String(hoje.getMonth()+1).padStart(2,'0');
+  const a = _pIni, b = _pFim || _pIni;
+  $('mes-ano-txt').textContent = _mesAno;
+  $('mes-grade').innerHTML = MESES_ABR.map((n,i) => {
+    const k = _mesAno + '-' + String(i+1).padStart(2,'0');
+    const dentro = a && b && k >= a && k <= b, ponta = k === a || k === b;
+    return `<button type="button" class="${ponta?'sel':(dentro?'faixa':'')} ${k===hojeKey?'hoje':''}" onclick="mesPickerClique('${k}')">${n}</button>`;
+  }).join('');
+  const r = $('mes-resumo'); if(r) r.textContent = !a ? '' : ((!_pFim || _pFim === a) ? 'Mês: ' + monthFullName(a) : 'Período: ' + mesAbr(a) + ' até ' + mesAbr(_pFim));
+  // atalhos do ano mostrado
+  const at = $('mes-atalhos'); if(at){
+    const y = _mesAno, m = n => y + '-' + String(n).padStart(2,'0');
+    const lista = [['1º Tri',1,3],['2º Tri',4,6],['3º Tri',7,9],['4º Tri',10,12],['1º Sem',1,6],['2º Sem',7,12],['Ano todo',1,12]];
+    at.innerHTML = lista.map(([t,x,z]) => `<button type="button" onclick="mesPickerFaixa('${m(x)}','${m(z)}')">${t}</button>`).join('');
+  }
+}
+function mesPickerClique(k){
+  if(!_pIni || _pFim){ _pIni = k; _pFim = null; }                      // começa uma nova escolha
+  else { if(k < _pIni){ _pFim = _pIni; _pIni = k; } else _pFim = k; }   // fecha o período
+  mesPickerDesenhar();
+}
+function mesPickerFaixa(a, b){ _pIni = a; _pFim = b; mesPickerDesenhar(); }
+function mesPickerAbrir(e){
+  if(e) e.stopPropagation();
+  const sel = $('month-selector'); if(sel && sel.disabled) return;
+  const pop = $('mes-pop'); if(!pop) return;
+  if(pop.style.display !== 'none'){ pop.style.display = 'none'; return; }
+  if(window.__periodo){ _pIni = window.__periodo.ini; _pFim = window.__periodo.fim; }
+  else { _pIni = (sel && sel.value) || currentMonth; _pFim = _pIni; }   // escolha atual já "fechada": o próximo clique começa outra
+  _mesAno = parseInt(String(_pIni).slice(0,4), 10) || new Date().getFullYear();
+  mesPickerDesenhar(); pop.style.display = 'block';
+}
+function mesPickerAno(d){ _mesAno += d; mesPickerDesenhar(); }
+function mesPickerAplicar(){
+  const pop = $('mes-pop'); if(!_pIni) return;
+  if(pop) pop.style.display = 'none';
+  if(!_pFim || _pFim === _pIni) mesPickerEscolher(_pIni); else aplicarPeriodo(_pIni, _pFim);
+}
+function mesPickerEscolher(k){
+  const sel = $('month-selector'); if(!sel) return;
+  if(!Array.from(sel.options).some(o => o.value === k)){   // ano que ainda não estava na lista: cria o mês
+    const o = document.createElement('option'); o.value = k; o.textContent = monthFullName(k); sel.appendChild(o);
+  }
+  sel.value = k; const pop = $('mes-pop'); if(pop) pop.style.display = 'none';
+  changeMonth(); mesPickerAtualizar();
+}
+function mesPickerHoje(e){ if(e) e.preventDefault(); const h = new Date(); mesPickerEscolher(h.getFullYear() + '-' + String(h.getMonth()+1).padStart(2,'0')); }
+document.addEventListener('click', () => { const p = $('mes-pop'); if(p) p.style.display = 'none'; });
+document.addEventListener('keydown', e => { if(e.key === 'Escape'){ const p = $('mes-pop'); if(p) p.style.display = 'none'; } });
+setInterval(mesPickerAtualizar, 700);   // o título acompanha o mês/período (inclusive quando muda por link)
+
+// Período (vários meses): só leitura — soma Meta e Realizado dos meses; Cenário e Carteira = do último mês com dado
+async function aplicarPeriodo(ini, fim){
+  const meses = []; let [y, m] = ini.split('-').map(Number); const [fy, fm] = fim.split('-').map(Number);
+  while(y < fy || (y === fy && m <= fm)){ meses.push(y + '-' + String(m).padStart(2,'0')); m++; if(m > 12){ m = 1; y++; } if(meses.length > 36) break; }
+  if(!window.__periodo && _ready){ saveData(); saveClientsData(); }   // guarda o mês que estava aberto, antes de sair dele
+  showNotification('⏳ Carregando o período…');
+  initSupabase();
+  const resultados = await Promise.all(meses.map(k => carregarDadosSupabase(k + '-01')));
+  const soma = {};
+  resultados.forEach(dados => {
+    (mapearDadosSupabase(dados) || []).forEach(r => {
+      const a = soma[r.name] || (soma[r.name] = { meta: 0, real: 0, prev: 0, car: 0 });
+      a.meta += r.meta; a.real += r.real; a.prev = r.prev; a.car = r.car;   // meses em ordem: o último com dado vence
+    });
+  });
+  window.__periodo = { ini: meses[0], fim: meses[meses.length-1] };
+  BASE.forEach((r, i) => {
+    const a = soma[r.name] || { meta: 0, real: 0, prev: 0, car: 0 };
+    r.meta = a.meta; r.real = a.real; r.prev = a.prev; r.car = a.car;
+    [['meta','i-meta-'],['real','i-real-'],['prev','i-prev-'],['car','i-car-']].forEach(([c, id]) => {
+      const el = $(id + i); if(el){ el.value = fmtN(r[c]); el.disabled = true; el.style.cursor = 'not-allowed'; }
+    });
+  });
+  const hm = $('hdr-month'); if(hm) hm.textContent = mesAbr(window.__periodo.ini) + ' – ' + mesAbr(window.__periodo.fim);
+  recalc(); mesPickerAtualizar();
+  showNotification('📅 Período: ' + mesAbr(window.__periodo.ini) + ' – ' + mesAbr(window.__periodo.fim) + ' (somente leitura)');
+  sincronizarAnoAgenda();
+}
+
 // O seletor de mês do topo também comanda o ANO da Agenda de Viagens/Visitas (mesmo endereço: srcdoc)
 function sincronizarAnoAgenda(){
   try{
@@ -3913,8 +4040,9 @@ function sincronizarAnoAgenda(){
 (function(){ const f = document.getElementById('agenda-frame'); if(f) f.addEventListener('load', () => setTimeout(sincronizarAnoAgenda, 400)); })();
 
 function changeMonth(){
-  // 1. Salva dados do mês ATUAL antes de mudar
-  if(_ready) {
+  // 1. Salva dados do mês ATUAL antes de mudar (em modo período não há o que salvar: é só leitura)
+  if(window.__periodo){ window.__periodo = null; }
+  else if(_ready) {
     saveData();
     saveClientsData();
   }
@@ -8498,6 +8626,7 @@ function getStoreKey(){
 
 function saveData(){
   if(!_ready) return;
+  if(window.__periodo) return;   // período (vários meses) é só leitura: nunca grava
   const data = {
     monthly: BASE.map((_,i)=>({
       meta: $('i-meta-'+i) ? $('i-meta-'+i).value : '',
