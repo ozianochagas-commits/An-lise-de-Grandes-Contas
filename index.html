@@ -4376,8 +4376,52 @@ function buildCombinedInativ(reps){
 // __v = versão do formato. Ao subir a versão, dados antigos são descartados
 // (força reimportar) para não trazer bugs de versões anteriores.
 const INATIV_STORE_VER = 2;
+const INATIV_CFG_CHAVE = 'inativ_byrep_v2';
 function saveInativByRep(){
   try{ localStorage.setItem('riosulense_inativ_byrep', JSON.stringify({__v:INATIV_STORE_VER, d:INATIV_BY_REP})); }catch(e){}
+  salvarInativNaNuvem();
+}
+// Cópia da análise de Clientes Inativos na nuvem (antes só existia neste navegador: limpou o navegador = sumiu)
+let __tInativCloud = null;
+function salvarInativNaNuvem(){
+  if(window.__linkCompartilhado) return;
+  clearTimeout(__tInativCloud);
+  __tInativCloud = setTimeout(async () => {
+    try{
+      initSupabase(); if(!window.supabaseClient) return;
+      await window.supabaseClient.from('configuracoes').upsert(
+        { chave: INATIV_CFG_CHAVE, valor: { __v: INATIV_STORE_VER, d: INATIV_BY_REP || {}, em: new Date().toISOString() }, updated_at: new Date().toISOString() },
+        { onConflict: 'chave' });
+    }catch(e){ console.warn('⚠️ Clientes Inativos não foi para a nuvem agora:', e); }
+  }, 1500);
+}
+// Se este navegador está sem a análise (limpou o navegador, outro aparelho…), traz de volta a da nuvem
+async function restaurarInativSeVazio(){
+  try{
+    initSupabase(); const sb = window.supabaseClient; if(!sb) return;
+    const temLocal = () => Object.keys(INATIV_BY_REP || {}).length > 0;
+    const { data: cfg } = await sb.from('configuracoes').select('valor').eq('chave', INATIV_CFG_CHAVE).maybeSingle();
+    if(temLocal()){ if(!cfg) salvarInativNaNuvem(); return; }             // tem aqui: só garante a cópia na nuvem
+    let dados = null, quando = null, origem = '';
+    if(cfg && cfg.valor){
+      const d = cfg.valor.d;
+      if(d && Object.keys(d).length){ dados = d; quando = cfg.valor.em; origem = 'cópia na nuvem'; }
+      else return;                                                          // foi esvaziado de propósito (Nova Importação)
+    } else {
+      // sem cópia na nuvem: usa a análise do último link compartilhado que a trazia
+      const { data: links } = await sb.from('shared_links').select('payload,created_at').order('created_at', { ascending: false }).limit(8);
+      const bons = (links || []).filter(l => l.payload && l.payload.inativByRep && Object.keys(l.payload.inativByRep).length);
+      const l = bons.find(x => Object.keys(x.payload.inativByRep).length >= 3) || bons[0];
+      if(l){ dados = l.payload.inativByRep; quando = l.created_at; origem = 'último link compartilhado'; }
+    }
+    if(!dados || temLocal()) return;
+    INATIV_BY_REP = dados;
+    try{ applyGroupOverrides(); applyGroupMerges(); applyFilialOverrides(); }catch(e){}
+    saveInativByRep();
+    try{ refreshInativForRep(); }catch(e){}
+    const dt = quando ? new Date(quando).toLocaleDateString('pt-BR') : '';
+    showNotification('♻️ Clientes Inativos restaurado (' + origem + (dt ? ', de ' + dt : '') + '). Se a planilha mudou, importe de novo.');
+  }catch(e){ console.warn('⚠️ Não foi possível restaurar Clientes Inativos:', e); }
 }
 function loadInativByRep(){
   try{
@@ -4387,8 +4431,8 @@ function loadInativByRep(){
     if(parsed && parsed.__v === INATIV_STORE_VER && parsed.d){
       INATIV_BY_REP = parsed.d;                 // versão atual → usa
     } else {
-      INATIV_BY_REP = {};                        // versão antiga → descarta
-      try{ localStorage.removeItem('riosulense_inativ_byrep'); }catch(e){}
+      INATIV_BY_REP = {};                        // versão antiga → não usa (mas NÃO apaga: fica guardada)
+      try{ localStorage.setItem('riosulense_inativ_byrep_antigo', raw); }catch(e){}
     }
   }catch(e){ INATIV_BY_REP = {}; }
   applyGroupOverrides();   // corrige grupos com ajuste manual mesmo em dados já salvos
@@ -8717,6 +8761,7 @@ async function initDashboard() {
   // 3. Continua inicialização
   setAutoDate();
   if(!shared) loadInativByRep();  // carrega análise de grandes contas por representante
+  if(!shared) restaurarInativSeVazio();   // sem a análise neste navegador? traz da nuvem
   if(!shared) await loadPlanoByRep();   // carrega plano de negócio por representante
   buildFilter();        // cria os checkboxes do dropdown
   // Usuário do sistema → só os representantes da região dele (link compartilhado: sem região)
