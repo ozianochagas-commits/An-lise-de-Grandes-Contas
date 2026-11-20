@@ -73,7 +73,7 @@ table.t td.n,table.t th.n{text-align:right}
 .zero{color:var(--red);font-weight:800}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom));background:#222;color:#fff;border-radius:999px;padding:10px 18px;font-size:.85rem;z-index:99;display:none}
 .quem button{margin-bottom:10px}
-#fCliente,#fCidade,#fEnd,#fTipo,#fRep,#fObj,#fRes,.nome,.sub{text-transform:uppercase}
+#fCliente,#fCidade,#fEnd,#fTipo,#fRep,#fObj,#fRes,#fDiaSaida,#fDiaChegada,.nome,.sub{text-transform:uppercase}
 </style>
 </head>
 <body>
@@ -142,6 +142,47 @@ function visitaParaLinha(v){ return {id:v.id,data:v.data,hora:v.hora||null,usuar
 function linhaParaVisita(l){ return {id:l.id,data:l.data,hora:l.hora||'',usuario:l.usuario||PADRAO,cliente:l.cliente||'',tipo:l.tipo||'',cidade:l.cidade||'',rep:l.rep||'',objetivo:l.objetivo||'',resultado:l.resultado||'',status:l.status||'Agendada',viagemId:l.viagem_id||undefined,lat:l.lat??undefined,lon:l.lon??undefined,checkinEm:l.checkin_em||undefined,tel:l.telefone||'',endereco:l.endereco||'',_syncEm:l.updated_at}; }
 function viagemParaLinha(v){ return {id:v.id,titulo:v.titulo||'',rep:v.rep||null,usuario:usuarioDe(v),cidade:v.cidade||null,ini:v.ini||null,fim:v.fim||null,status:v.status||null,transp:v.transp||null,obs:v.obs||null,resultado:v.resultado||null,propostas:(v.propostas&&v.propostas.length)?v.propostas:null,anexos:(v.anexos&&v.anexos.length)?v.anexos:null,confirmada_em:v.confirmadaEm||null,updated_at:v._syncEm||new Date().toISOString()}; }
 function linhaParaViagem(l){ return {id:l.id,titulo:l.titulo,rep:l.rep||undefined,usuario:l.usuario||PADRAO,cidade:l.cidade||undefined,ini:l.ini,fim:l.fim,status:l.status,transp:l.transp||undefined,obs:l.obs||'',resultado:l.resultado||'',propostas:Array.isArray(l.propostas)?l.propostas:[],anexos:Array.isArray(l.anexos)?l.anexos:[],confirmadaEm:l.confirmada_em||undefined,_syncEm:l.updated_at}; }
+/* ---------- Onde o dia começa e termina (saída/chegada por dia) — mesmos dados do app do computador ---------- */
+let ENDERECOS=lsGet('agenda_enderecos_v2',{}), DIAS_END=lsGet('agenda_dias_v1',{});
+const diaEnd=(u,d)=>DIAS_END[u+'|'+d]||{};
+const saidaDe=u=>(ENDERECOS[u]&&ENDERECOS[u].saida)||'';
+const chegadaDe=u=>{ const e=ENDERECOS[u]||{}; return e.chegada||e.saida||''; };
+let _tDia={};
+function salvarDia(u,d,campo,v){
+  const k=u+'|'+d, e=DIAS_END[k]=Object.assign({saida:'',chegada:''},DIAS_END[k]); e[campo]=v.trim(); e.em=new Date().toISOString();
+  lsSet('agenda_dias_v1',DIAS_END);
+  clearTimeout(_tDia[k]); _tDia[k]=setTimeout(()=>{ sb('agenda_dias?on_conflict=usuario,data',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify([{usuario:u,data:d,saida:e.saida||'',chegada:e.chegada||'',updated_at:e.em}])}).catch(x=>console.error('dia não foi para a nuvem',x)); },600);
+}
+async function sincronizarDiasEnd(){
+  try{
+    const r=(await sb('agenda_dias?select=*'))||[]; let mudou=false;
+    r.forEach(x=>{ const k=x.usuario+'|'+x.data, l=DIAS_END[k]; if(!l||new Date(x.updated_at)>new Date(l.em||0)){ DIAS_END[k]={saida:x.saida||'',chegada:x.chegada||'',em:x.updated_at}; mudou=true; } });
+    Object.keys(DIAS_END).forEach(k=>{ const p=k.split('|'), x=r.find(y=>y.usuario===p[0]&&y.data===p[1]), l=DIAS_END[k]; if((!x||new Date(l.em||0)>new Date(x.updated_at))&&(l.saida||l.chegada)) sb('agenda_dias?on_conflict=usuario,data',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify([{usuario:p[0],data:p[1],saida:l.saida||'',chegada:l.chegada||'',updated_at:l.em||new Date().toISOString()}])}).catch(()=>{}); });
+    if(mudou) lsSet('agenda_dias_v1',DIAS_END);
+    const e2=(await sb('agenda_enderecos?select=*'))||[]; let m2=false;
+    e2.forEach(x=>{ const l=ENDERECOS[x.usuario]; if(!l||new Date(x.updated_at)>new Date(l.em||0)){ ENDERECOS[x.usuario]={saida:x.saida||'',chegada:x.chegada||'',em:x.updated_at}; m2=true; } });
+    if(m2) lsSet('agenda_enderecos_v2',ENDERECOS);
+  }catch(e){ console.error('dias/endereços:',e); }
+}
+function enderecosUsados(){
+  const mapa={}; const add=(t,em)=>{ t=String(t||'').trim(); if(!t||t==='-') return; const k=t.toUpperCase(), e=new Date(em||0).getTime(); if(!mapa[k]||e>mapa[k].e) mapa[k]={t,e}; };
+  Object.keys(DIAS_END).forEach(k=>{ const e=DIAS_END[k]; add(e.saida,e.em); add(e.chegada,e.em); });
+  Object.keys(ENDERECOS).forEach(u=>{ const e=ENDERECOS[u]; add(e.saida,e.em); add(e.chegada,e.em); });
+  return Object.values(mapa).sort((x,y)=>y.e-x.e).map(x=>x.t);
+}
+/* digitou "CASA"? vira o endereço de casa cadastrado */
+function casaEnd(el,campo){ if(norm(el.value).trim()==='casa'){ const c=campo==='chegada'?chegadaDe(usuario):saidaDe(usuario); if(c) el.value=c; } }
+function carregarDiaM(){
+  const d=$('fData').value, s=$('fDiaSaida'), c=$('fDiaChegada'); if(!s||!c) return;
+  const dl=$('dlEnd'); if(dl) dl.innerHTML=enderecosUsados().slice(0,40).map(t=>`<option value="${esc(t)}"></option>`).join('');
+  const e=d?diaEnd(usuario,d):{}; s.value=e.saida||''; c.value=e.chegada||'';
+  // dia ainda sem saída: se o dia anterior terminou fora de casa (hotel, outra cidade), o início de hoje já vem com esse lugar
+  if(!s.value&&d){
+    const ant=Object.keys(DIAS_END).filter(k=>{ const p=k.split('|'); return p[0]===usuario&&p[1]<d&&(DIAS_END[k].chegada||'')&&DIAS_END[k].chegada!=='-'; }).map(k=>k.split('|')[1]).sort().pop();
+    if(ant){ const dif=(new Date(d+'T12:00:00')-new Date(ant+'T12:00:00'))/86400000; if(dif>0&&dif<=3) s.value=DIAS_END[usuario+'|'+ant].chegada; }
+  }
+  s.placeholder='Casa: '+(saidaDe(usuario)||'(cadastre no computador)'); c.placeholder='Casa: '+(chegadaDe(usuario)||'(cadastre no computador)');
+}
 function setSync(ok){ $('sync').classList.toggle('off',!ok); $('sync').title=ok?'Sincronizado':'Sem conexão: salvo no aparelho, envia quando voltar'; }
 async function enviar(tabela,lista,map){
   if(!lista.length) return true;
@@ -160,6 +201,7 @@ async function sincronizar(){
     if(a.mud) gravaV(); if(b.mud) gravaVia();
     await enviar('agenda_visitas',a.env,visitaParaLinha); await enviar('agenda_viagens',b.env,viagemParaLinha);
     setSync(true); renderTudo();
+    sincronizarDiasEnd();
   }catch(e){ console.error(e); setSync(false); }
 }
 
@@ -226,8 +268,15 @@ function fecharSheet(){ $('sheet').classList.remove('on'); }
 function formVisita(v,titulo){
   abrirSheet(`<h3>${titulo}<span onclick="fecharSheet()">×</span></h3>
     <input type="hidden" id="fId" value="${v.id||''}">
-    <div class="duo"><div><label class="f">Data</label><input type="date" id="fData" value="${v.data}" onchange="dicaViagem()"></div><div><label class="f">Horário</label><input type="time" id="fHora" value="${esc(v.hora||'')}" oninput="this.dataset.auto=''"></div></div>
+    <div class="duo"><div><label class="f">Data</label><input type="date" id="fData" value="${v.data}" onchange="dicaViagem();carregarDiaM()"></div><div><label class="f">Horário</label><input type="time" id="fHora" value="${esc(v.hora||'')}" oninput="this.dataset.auto=''"></div></div>
     <div class="hint" id="fDica"></div>
+    <datalist id="dlEnd"></datalist>
+    <div style="background:#FFF8F0;border:1.5px solid #f3d9c9;border-radius:10px;padding:10px 12px;margin-top:12px">
+      <label class="f" style="margin-top:0">Onde o dia começa e termina?</label>
+      <label class="f" style="font-weight:500;color:#888;font-size:.74rem">Início do dia (saída)</label><input id="fDiaSaida" list="dlEnd" autocomplete="off" onchange="casaEnd(this,'saida')">
+      <label class="f" style="font-weight:500;color:#888;font-size:.74rem">Final do dia (chegada)</label><input id="fDiaChegada" list="dlEnd" autocomplete="off" onchange="casaEnd(this,'chegada')">
+      <div class="hint" style="margin-top:6px">Vale para todas as visitas deste dia. Em branco = endereço de casa cadastrado. Use <b>-</b> para não mostrar saída/chegada. Digite <b>CASA</b> para usar o endereço de casa.</div>
+    </div>
     <label class="f">Cliente</label><input id="fCliente" value="${esc(v.cliente||'')}" placeholder="Digite o nome ou o código…" autocomplete="off" oninput="buscaCliente()" onfocus="carregarClientes()">
     <div class="sug" id="fSug" style="display:none"></div>
     <label class="f">Tipo de cliente</label><select id="fTipo"><option value="">—</option>${['Distribuidor','Retífica','Mecânica','Direto Rio'].map(s=>`<option ${v.tipo===s?'selected':''}>${s}</option>`).join('')}</select>
@@ -243,7 +292,7 @@ function formVisita(v,titulo){
     <label class="f">Resultado</label><textarea id="fRes" placeholder="Preencha depois da visita">${esc(v.resultado||'')}</textarea>
     <div class="acoes" style="margin-top:16px"><button class="btn p" onclick="salvarVisita(false)">Salvar</button>${v.id?'':`<button class="btn g" onclick="salvarVisita(true)">Salvar e outra</button>`}
     ${v.id?`<button class="btn d" onclick="excluirVisita(${v.id})">Excluir</button>`:''}</div>`);
-  dicaViagem();
+  dicaViagem(); carregarDiaM();
 }
 function novaVisita(data){ formVisita({data:data||hoje(),status:'Agendada'},'Nova visita'); }
 function editarVisita(id){ const v=visitas.find(x=>x.id===id); if(v) formVisita(v,'Editar visita'); }
@@ -263,6 +312,9 @@ async function salvarVisita(outra){
   const dados={data,hora:$('fHora').value,usuario,cliente:cliente.toUpperCase(),tipo:$('fTipo').value,cidade:$('fCidade').value.trim().toUpperCase(),tel:$('fTel').value.trim(),endereco:$('fEnd').value.trim(),lat:($('fLat').value!==''?+$('fLat').value:(id?(visitas.find(x=>x.id===+id)||{}).lat:undefined)),lon:($('fLon').value!==''?+$('fLon').value:(id?(visitas.find(x=>x.id===+id)||{}).lon:undefined)),rep:$('fRep').value,objetivo:$('fObj').value.trim(),resultado:$('fRes').value.trim(),status:$('fSt').value,viagemId:vg?vg.id:undefined};
   let alvo; if(id){ alvo=visitas.find(x=>x.id===+id); Object.assign(alvo,dados); } else { dados.id=Date.now(); visitas.push(dados); alvo=dados; }
   alvo._syncEm=new Date().toISOString(); gravaV(); renderTudo();
+  { const sd=$('fDiaSaida').value.trim().toUpperCase(), cd=$('fDiaChegada').value.trim().toUpperCase(), ex=diaEnd(usuario,data);
+    if(sd.toUpperCase()!==String(ex.saida||'').toUpperCase()) salvarDia(usuario,data,'saida',sd);
+    if(cd.toUpperCase()!==String(ex.chegada||'').toUpperCase()) salvarDia(usuario,data,'chegada',cd); }
   const ok=await enviar('agenda_visitas',[alvo],visitaParaLinha); toast(ok?'Visita salva ✓':'Salva no aparelho (sem internet)');
   if(outra&&!id){ const d=dados; formVisita({data:d.data,hora:'',cidade:d.cidade,rep:d.rep,status:'Agendada'},'Nova visita'); setTimeout(()=>$('fCliente').focus(),80); } else fecharSheet();
 }
