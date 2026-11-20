@@ -2690,10 +2690,9 @@ function lerClientesLocalStorage(){
 }
 
 function loadClientsData(){
-  // Primeiro, reinicializa CLIENTS para esse mês
-  BASE.forEach((_, i) => {
-    if(!CLIENTS[i]) CLIENTS[i] = [];
-  });
+  // Primeiro, reinicializa CLIENTS para esse mês: zera o que ficou na memória do mês anterior
+  // (antes, um mês sem previsões salvas herdava as do mês anterior — e as gravava no mês novo)
+  BASE.forEach((_, i) => { CLIENTS[i] = []; });
 
   try{
     const raw = localStorage.getItem('riosulense_clients_'+currentMonth);
