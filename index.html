@@ -4383,14 +4383,15 @@ function saveInativByRep(){
 }
 // Cópia da análise de Clientes Inativos na nuvem (antes só existia neste navegador: limpou o navegador = sumiu)
 let __tInativCloud = null;
-function salvarInativNaNuvem(){
+function salvarInativNaNuvem(opc){
   if(window.__linkCompartilhado) return;
+  opc = opc || {};
   clearTimeout(__tInativCloud);
   __tInativCloud = setTimeout(async () => {
     try{
       initSupabase(); if(!window.supabaseClient) return;
       await window.supabaseClient.from('configuracoes').upsert(
-        { chave: INATIV_CFG_CHAVE, valor: { __v: INATIV_STORE_VER, d: INATIV_BY_REP || {}, em: new Date().toISOString() }, updated_at: new Date().toISOString() },
+        { chave: INATIV_CFG_CHAVE, valor: { __v: INATIV_STORE_VER, d: INATIV_BY_REP || {}, em: opc.em || new Date().toISOString(), restaurado: !!opc.restaurado }, updated_at: new Date().toISOString() },
         { onConflict: 'chave' });
     }catch(e){ console.warn('⚠️ Clientes Inativos não foi para a nuvem agora:', e); }
   }, 1500);
@@ -4401,7 +4402,8 @@ async function restaurarInativSeVazio(){
     initSupabase(); const sb = window.supabaseClient; if(!sb) return;
     const temLocal = () => Object.keys(INATIV_BY_REP || {}).length > 0;
     const { data: cfg } = await sb.from('configuracoes').select('valor').eq('chave', INATIV_CFG_CHAVE).maybeSingle();
-    if(temLocal()){ if(!cfg) salvarInativNaNuvem(); return; }             // tem aqui: só garante a cópia na nuvem
+    // tem aqui: garante a cópia na nuvem (e a análise REAL deste navegador vale mais que uma cópia só "restaurada" de link antigo)
+    if(temLocal()){ if(!cfg || (cfg.valor && cfg.valor.restaurado)) salvarInativNaNuvem(); return; }
     let dados = null, quando = null, origem = '';
     if(cfg && cfg.valor){
       const d = cfg.valor.d;
@@ -4417,7 +4419,9 @@ async function restaurarInativSeVazio(){
     if(!dados || temLocal()) return;
     INATIV_BY_REP = dados;
     try{ applyGroupOverrides(); applyGroupMerges(); applyFilialOverrides(); }catch(e){}
-    saveInativByRep();
+    try{ localStorage.setItem('riosulense_inativ_byrep', JSON.stringify({__v:INATIV_STORE_VER, d:INATIV_BY_REP})); }catch(e){}
+    if(origem === 'cópia na nuvem'){ /* já está na nuvem */ }
+    else salvarInativNaNuvem({ restaurado: true, em: quando || new Date().toISOString() });   // marcada como restaurada de link antigo
     try{ refreshInativForRep(); }catch(e){}
     const dt = quando ? new Date(quando).toLocaleDateString('pt-BR') : '';
     showNotification('♻️ Clientes Inativos restaurado (' + origem + (dt ? ', de ' + dt : '') + '). Se a planilha mudou, importe de novo.');
