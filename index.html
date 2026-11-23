@@ -2191,6 +2191,17 @@ function closeClientModal(event){
   recalc();
 }
 
+// Esc fecha a janela aberta (Detalhamento do Cenário Comercial, link de compartilhar, configurações)
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape') return;
+  const mo = $('modal-overlay');
+  if(mo && mo.classList.contains('show')){ closeClientModal(); return; }
+  const ms = $('modal-share');
+  if(ms && ms.classList.contains('show')){ fecharLinkModal(); return; }
+  const mc = $('modal-config');
+  if(mc && mc.classList.contains('on')){ fecharConfig(); return; }
+});
+
 function addClientToPreview(){
   if(currentModalRepIndex < 0) return;
   
