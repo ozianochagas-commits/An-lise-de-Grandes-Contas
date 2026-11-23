@@ -2202,6 +2202,28 @@ document.addEventListener('keydown', e => {
   if(mc && mc.classList.contains('on')){ fecharConfig(); return; }
 });
 
+// Enter na tabela de Editar Dados: vai para o campo de baixo (mesma coluna); Shift+Enter, para o de cima.
+// No fim da coluna, segue para o 1º campo da próxima coluna (Meta → Realizado → Cenário → Carteira).
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Enter') return;
+  const el = e.target;
+  if(!el || !el.classList || !el.classList.contains('einput') || !/^i-(meta|real|prev|car)-\d+$/.test(el.id || '')) return;
+  e.preventDefault();
+  const cols = ['meta','real','prev','car'];
+  const col = el.id.split('-')[1];
+  const visiveis = c => Array.from(document.querySelectorAll('.einput[id^="i-' + c + '-"]')).filter(x => x.offsetParent !== null && !x.disabled);
+  let lista = visiveis(col), pos = lista.indexOf(el), alvo = null;
+  if(e.shiftKey){
+    if(pos > 0) alvo = lista[pos-1];
+    else { const ant = visiveis(cols[(cols.indexOf(col) + 3) % 4]); alvo = ant[ant.length-1]; }
+  } else {
+    if(pos >= 0 && pos < lista.length - 1) alvo = lista[pos+1];
+    else { const prox = visiveis(cols[(cols.indexOf(col) + 1) % 4]); alvo = prox[0]; }
+  }
+  if(el.blur) el.blur();                       // aplica a formatação do campo que estava sendo digitado
+  if(alvo){ alvo.focus(); try{ alvo.select(); }catch(x){} }
+});
+
 function addClientToPreview(){
   if(currentModalRepIndex < 0) return;
   
