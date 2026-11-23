@@ -2554,6 +2554,13 @@ function exportPrevisaoPDF(){
     else          { confirmados.push(reg); totConf += v; passConf += p; }
   });
 
+  // Mesma ordem da lista na tela (Cenário / Passou / Gap / Cliente, maior→menor ou o contrário).
+  // Sem escolha na tela, o PDF sai do maior para o menor Cenário.
+  { const col = _ordClientes.col || 'cenario', dir = (_ordClientes.col ? _ordClientes.dir : 'desc') === 'asc' ? 1 : -1;
+    const val = r => col === 'cenario' ? r.v : col === 'passou' ? r.p : col === 'gap' ? r.g : String(r.n || '').toLowerCase();
+    const ord = (x, y) => { const a = val(x), b = val(y); const r = (typeof a === 'string') ? a.localeCompare(b, 'pt-BR') : (a - b); return r * dir; };
+    confirmados.sort(ord); aguardando.sort(ord); }
+
   const totGeral  = totConf + totAgu;
   const passGeral = passConf + passAgu;
   const gapGeral  = passGeral - totGeral;
