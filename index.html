@@ -1533,6 +1533,7 @@ try{
   </div>
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
     <div class="stitle" style="border-radius:8px 8px 0 0;flex:1">✏️ &nbsp;Edite: META · REALIZADO · CENÁRIO COMERCIAL · CARTEIRA</div>
+    <button class="pdf-btn" onclick="exportPrevisaoTodosPDF()" style="margin:0 0 0 12px;height:38px;border-radius:6px;white-space:nowrap" title="Um PDF com o Cenário Comercial de cada representante selecionado no filtro do topo, com um resumo na frente">🖨 Cenário Comercial — PDF dos selecionados</button>
     <button class="reset-btn" onclick="resetData()" style="margin-left:12px;height:38px;border-radius:6px">↺ Restaurar Valores</button>
   </div>
   <div class="etwrap">
@@ -1940,6 +1941,7 @@ try{
       </div>
       <div style="margin-top:12px;text-align:right;">
         <button class="modal-btn-add" style="background:var(--dark);" onclick="exportPrevisaoPDF()">🖨 Exportar Cenário Comercial em PDF</button>
+        <button class="modal-btn-add" style="background:var(--orange);margin-left:8px" onclick="exportPrevisaoTodosPDF()" title="Um PDF com todos os representantes selecionados no filtro do topo">🖨 PDF de todos os selecionados</button>
       </div>
     </div>
   </div>
@@ -2528,19 +2530,11 @@ function setClientReal(clientIdx, raw){
 // ── EXPORTAR PREVISÃO EM PDF ─────────────────────────────────────
 // Cliente MARCADO  = confirmado / já passou
 // Cliente DESMARCADO = ainda no aguardo
-function exportPrevisaoPDF(){
-  if(currentModalRepIndex < 0){
-    alert('Abra o cenário comercial de um representante antes de exportar.');
-    return;
-  }
-  const rep = BASE[currentModalRepIndex];
-  const clients = CLIENTS[currentModalRepIndex] || [];
-
-  if(clients.length === 0){
-    alert('Não há clientes cadastrados neste cenário comercial.');
-    return;
-  }
-
+// Dados + bloco HTML do Cenário Comercial de UM representante (usado no PDF de um e no PDF de vários)
+function blocoPrevisaoRep(idx){
+  const rep = BASE[idx];
+  const clients = CLIENTS[idx] || [];
+  if(!clients.length) return null;
   const confirmados = [];
   const aguardando  = [];
   let totConf = 0, totAgu = 0;              // previsto
@@ -2589,8 +2583,44 @@ function exportPrevisaoPDF(){
   const mesTexto = (document.getElementById('month-selector')||{}).selectedOptions
     ? document.getElementById('month-selector').selectedOptions[0].text : '';
 
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-<title>Cenário Comercial — ${rep.name}</title>
+  
+  const bodyHtml = `<div class="rep">${rep.name}</div>
+  <div class="sub">${mesTexto} &nbsp;·&nbsp; Emitido em ${new Date().toLocaleString('pt-BR')} &nbsp;·&nbsp; ${clients.length} cliente(s)</div>
+
+  <h2 class="ok">✓ Confirmados / já passaram &nbsp;—&nbsp; ${confirmados.length} cliente(s)</h2>
+  <table>${cab}${linhas(confirmados)}</table>
+  ${rodape(totConf, passConf)}
+
+  <h2 class="ag">⏳ Ainda no aguardo &nbsp;—&nbsp; ${aguardando.length} cliente(s)</h2>
+  <table>${cab}${linhas(aguardando)}</table>
+  ${rodape(totAgu, passAgu)}
+
+  <div class="geral">
+    <div>
+      <div style="font-size:9px;opacity:.65;letter-spacing:1px">CENÁRIO</div>
+      <div style="font-size:14px;font-weight:900">${R(totGeral)}</div>
+    </div>
+    <div>
+      <div style="font-size:9px;opacity:.65;letter-spacing:1px">PASSOU</div>
+      <div style="font-size:14px;font-weight:900;color:#FE5000">${R(passGeral)}</div>
+    </div>
+    <div>
+      <div style="font-size:9px;opacity:.65;letter-spacing:1px">GAP</div>
+      <div style="font-size:14px;font-weight:900;color:${gapGeral>=0?'#5DD879':'#FF7B6B'}">
+        ${(gapGeral>0?'+':'')+R(gapGeral)}</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:9px;opacity:.65;letter-spacing:1px">ATINGIDO</div>
+      <div style="font-size:20px;font-weight:900;color:#FE5000">${pct.toFixed(1).replace('.',',')}%</div>
+    </div>
+  </div>
+
+  `;
+  return { rep, qtd: clients.length, totGeral, passGeral, gapGeral, pct, bodyHtml };
+}
+function docPrevisao(titulo, folhas){
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Cenário Comercial — ${titulo}</title>
 <style>
   @page{size:A4 portrait;margin:12mm}
   *{box-sizing:border-box}
@@ -2628,48 +2658,57 @@ function exportPrevisaoPDF(){
     .cab,.geral,.sub-tot{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
 </style></head><body>
-<div class="folha">
+${folhas}
+<a id="mobBanner" href="/m/">📱 Abrir versão para celular <span>→</span></a></body></html>`;
+}
+function folhaPrevisao(inner, quebra){
+  return `<div class="folha"${quebra ? ' style="page-break-before:always;margin-top:18px"' : ''}>
   <div class="cab">
     <h1><img src="data:image/png;base64,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" alt="" style="height:22px;vertical-align:middle;background:#fff;border-radius:4px;padding:2px 4px;margin-right:7px"> RIOSULENSE — Cenário Comercial</h1>
     <p>NORTE • NORDESTE • RIO</p>
   </div>
 
-  <div class="rep">${rep.name}</div>
-  <div class="sub">${mesTexto} &nbsp;·&nbsp; Emitido em ${new Date().toLocaleString('pt-BR')} &nbsp;·&nbsp; ${clients.length} cliente(s)</div>
+  ${inner}<div class="rod">Dashboard RIOSULENSE — documento gerado automaticamente</div>
+</div></div>`;
+}
 
-  <h2 class="ok">✓ Confirmados / já passaram &nbsp;—&nbsp; ${confirmados.length} cliente(s)</h2>
-  <table>${cab}${linhas(confirmados)}</table>
-  ${rodape(totConf, passConf)}
+function exportPrevisaoPDF(){
+  if(currentModalRepIndex < 0){
+    alert('Abra o cenário comercial de um representante antes de exportar.');
+    return;
+  }
+  const d = blocoPrevisaoRep(currentModalRepIndex);
+  if(!d){
+    alert('Não há clientes cadastrados neste cenário comercial.');
+    return;
+  }
+  printViaIframe(docPrevisao('Cenário Comercial — ' + d.rep.name, folhaPrevisao(d.bodyHtml, false)));
+}
 
-  <h2 class="ag">⏳ Ainda no aguardo &nbsp;—&nbsp; ${aguardando.length} cliente(s)</h2>
-  <table>${cab}${linhas(aguardando)}</table>
-  ${rodape(totAgu, passAgu)}
-
-  <div class="geral">
-    <div>
-      <div style="font-size:9px;opacity:.65;letter-spacing:1px">CENÁRIO</div>
-      <div style="font-size:14px;font-weight:900">${R(totGeral)}</div>
-    </div>
-    <div>
-      <div style="font-size:9px;opacity:.65;letter-spacing:1px">PASSOU</div>
-      <div style="font-size:14px;font-weight:900;color:#FE5000">${R(passGeral)}</div>
-    </div>
-    <div>
-      <div style="font-size:9px;opacity:.65;letter-spacing:1px">GAP</div>
-      <div style="font-size:14px;font-weight:900;color:${gapGeral>=0?'#5DD879':'#FF7B6B'}">
-        ${(gapGeral>0?'+':'')+R(gapGeral)}</div>
-    </div>
-    <div style="text-align:right">
-      <div style="font-size:9px;opacity:.65;letter-spacing:1px">ATINGIDO</div>
-      <div style="font-size:20px;font-weight:900;color:#FE5000">${pct.toFixed(1).replace('.',',')}%</div>
-    </div>
-  </div>
-
-  <div class="rod">Dashboard RIOSULENSE — documento gerado automaticamente</div>
-</div>
-<a id="mobBanner" href="/m/">📱 Abrir versão para celular <span>→</span></a></body></html>`;
-
-  printViaIframe(html);
+// PDF com o Cenário Comercial de TODOS os representantes selecionados no filtro do topo (uma página para cada um, com um resumo na frente)
+function exportPrevisaoTodosPDF(){
+  let idxs = Array.from(document.querySelectorAll('.rep-checkbox')).filter(cb => cb.checked).map(cb => parseInt(cb.dataset.idx));
+  if(!idxs.length) idxs = BASE.map((_, i) => i);
+  const dados = idxs.map(i => ({ i, d: blocoPrevisaoRep(i) }));
+  const com = dados.filter(x => x.d);
+  if(!com.length){ alert('Não há clientes cadastrados no Cenário Comercial dos representantes selecionados.'); return; }
+  const mesTexto = (document.getElementById('month-selector')||{}).selectedOptions && document.getElementById('month-selector').selectedOptions[0]
+    ? document.getElementById('month-selector').selectedOptions[0].text : '';
+  let tp = 0, tpas = 0, tq = 0;
+  const linhasResumo = dados.map(x => {
+    if(!x.d) return `<tr><td>${BASE[x.i].name}</td><td class="v cinza" colspan="5">sem previsões lançadas</td></tr>`;
+    tp += x.d.totGeral; tpas += x.d.passGeral; tq += x.d.qtd;
+    const cor = x.d.gapGeral > 0 ? 'pos' : (x.d.gapGeral < 0 ? 'neg' : 'cinza');
+    return `<tr><td>${BASE[x.i].name}</td><td class="v">${x.d.qtd}</td><td class="v">${R(x.d.totGeral)}</td><td class="v">${R(x.d.passGeral)}</td><td class="v ${cor}">${(x.d.gapGeral>0?'+':'')+R(x.d.gapGeral)}</td><td class="v">${x.d.pct.toFixed(1).replace('.',',')}%</td></tr>`;
+  }).join('');
+  const gapT = tpas - tp, pctT = tp ? tpas / tp * 100 : 0;
+  const resumo = `<div class="rep">Cenário Comercial — todos os representantes selecionados</div>
+    <div class="sub">${mesTexto} &nbsp;·&nbsp; Emitido em ${new Date().toLocaleString('pt-BR')} &nbsp;·&nbsp; ${com.length} representante(s) com previsões · ${tq} cliente(s)</div>
+    <table><tr class="cabtab"><td>Representante</td><td class="v">Clientes</td><td class="v" style="width:110px">Cenário</td><td class="v" style="width:100px">Passou</td><td class="v" style="width:100px">Gap</td><td class="v">Atingido</td></tr>
+      ${linhasResumo}
+      <tr style="background:#f4f4f4"><td><b>TOTAL</b></td><td class="v">${tq}</td><td class="v">${R(tp)}</td><td class="v">${R(tpas)}</td><td class="v ${gapT>0?'pos':(gapT<0?'neg':'cinza')}">${(gapT>0?'+':'')+R(gapT)}</td><td class="v">${pctT.toFixed(1).replace('.',',')}%</td></tr></table>`;
+  const folhas = folhaPrevisao(resumo, false) + com.map(x => folhaPrevisao(x.d.bodyHtml, true)).join('');
+  printViaIframe(docPrevisao('Cenário Comercial — representantes selecionados', folhas));
 }
 
 function getTotalClientsPrevision(repIndex){
