@@ -2659,7 +2659,7 @@ function docPrevisao(titulo, folhas){
   }
 </style></head><body>
 ${folhas}
-<a id="mobBanner" href="/m/">📱 Abrir versão para celular <span>→</span></a></body></html>`;
+</body></html>`;
 }
 function folhaPrevisao(inner, quebra){
   return `<div class="folha"${quebra ? ' style="page-break-before:always;margin-top:18px"' : ''}>
@@ -2682,7 +2682,7 @@ function exportPrevisaoPDF(){
     alert('Não há clientes cadastrados neste cenário comercial.');
     return;
   }
-  printViaIframe(docPrevisao('Cenário Comercial — ' + d.rep.name, folhaPrevisao(d.bodyHtml, false)));
+  printViaIframe(docPrevisao(d.rep.name, folhaPrevisao(d.bodyHtml, false)));
 }
 
 // PDF com o Cenário Comercial de TODOS os representantes selecionados no filtro do topo (uma página para cada um, com um resumo na frente)
@@ -2708,7 +2708,7 @@ function exportPrevisaoTodosPDF(){
       ${linhasResumo}
       <tr style="background:#f4f4f4"><td><b>TOTAL</b></td><td class="v">${tq}</td><td class="v">${R(tp)}</td><td class="v">${R(tpas)}</td><td class="v ${gapT>0?'pos':(gapT<0?'neg':'cinza')}">${(gapT>0?'+':'')+R(gapT)}</td><td class="v">${pctT.toFixed(1).replace('.',',')}%</td></tr></table>`;
   const folhas = folhaPrevisao(resumo, false) + com.map(x => folhaPrevisao(x.d.bodyHtml, true)).join('');
-  printViaIframe(docPrevisao('Cenário Comercial — representantes selecionados', folhas));
+  printViaIframe(docPrevisao('representantes selecionados', folhas));
 }
 
 function getTotalClientsPrevision(repIndex){
