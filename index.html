@@ -2391,6 +2391,15 @@ function removeClient(clientIdx){
   showNotification('✓ Cliente removido!');
 }
 
+// Ordenação da lista de clientes do Cenário (só muda como aparece; a ordem salva dos clientes não é alterada)
+let _ordClientes = { col: null, dir: 'desc' };
+function ordenarClientes(col){
+  if(_ordClientes.col !== col){ _ordClientes = { col, dir: 'desc' }; }          // 1º clique: do maior para o menor
+  else if(_ordClientes.dir === 'desc'){ _ordClientes.dir = 'asc'; }              // 2º clique: do menor para o maior
+  else { _ordClientes = { col: null, dir: 'desc' }; }                            // 3º clique: volta à ordem original
+  renderClientsList();
+}
+function setaOrd(col){ return _ordClientes.col === col ? (_ordClientes.dir === 'desc' ? ' ▼' : ' ▲') : ' ↕'; }
 function renderClientsList(){
   const listContainer = $('modal-clients-list');
   const modalTotal = $('modal-total');
@@ -2415,15 +2424,29 @@ function renderClientsList(){
   head.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;padding-left:24px;">
       <input type="checkbox" class="client-checkbox" id="check-all" ${todosSelecionados ? 'checked' : ''} onchange="toggleSelectAllClients(this.checked)" title="Selecionar todos">
-      <span>Cliente</span>
+      <span onclick="ordenarClientes('cliente')" style="cursor:pointer" title="Ordenar por cliente (A–Z / Z–A)">Cliente${setaOrd('cliente')}</span>
     </div>
-    <span class="cel-num">Cenário</span>
-    <span class="cel-num">Passou</span>
-    <span class="cel-num">Gap</span>
+    <span class="cel-num" onclick="ordenarClientes('cenario')" style="cursor:pointer" title="Ordenar do maior para o menor (e o contrário)">Cenário${setaOrd('cenario')}</span>
+    <span class="cel-num" onclick="ordenarClientes('passou')" style="cursor:pointer" title="Ordenar do maior para o menor (e o contrário)">Passou${setaOrd('passou')}</span>
+    <span class="cel-num" onclick="ordenarClientes('gap')" style="cursor:pointer" title="Ordenar do maior para o menor (e o contrário)">Gap${setaOrd('gap')}</span>
     <span></span>`;
   listContainer.appendChild(head);
 
-  for(let idx = 0; idx < clients.length; idx++){
+  // ordem de exibição (índices originais continuam valendo para marcar/remover/editar)
+  const ordem = clients.map((_, i) => i);
+  if(_ordClientes.col){
+    const dir = _ordClientes.dir === 'asc' ? 1 : -1;
+    const val = i => { const c = clients[i];
+      return _ordClientes.col === 'cenario' ? toNumber(c.value)
+           : _ordClientes.col === 'passou'  ? toNumber(c.real)
+           : _ordClientes.col === 'gap'     ? toNumber(c.real) - toNumber(c.value)
+           : String(c.name || '').toLowerCase(); };
+    ordem.sort((a, b) => { const x = val(a), y = val(b);
+      const r = (typeof x === 'string') ? x.localeCompare(y, 'pt-BR') : (x - y);
+      return (r * dir) || (a - b); });
+  }
+
+  for(const idx of ordem){
     const client = clients[idx];
 
     const clientValue = toNumber(client.value);
