@@ -2724,6 +2724,21 @@ function docPrevisao(titulo, folhas){
   }
 </style></head><body>
 ${folhas}
+<script>
+/* Cada folha tem de caber em UMA página A4: mede a altura com a largura da página impressa e reduz (zoom) só se passar. */
+function ajustaFolhas(){
+  var H = 990;                                   // altura útil aproximada (px) da A4 com margem de 12mm
+  document.querySelectorAll('.folha').forEach(function(f){
+    var antes = f.style.cssText;
+    f.style.zoom = 1; f.style.width = '703px'; f.style.maxWidth = 'none'; f.style.padding = '0';
+    var h = f.scrollHeight;
+    f.style.cssText = antes;
+    if(h > H) f.style.zoom = Math.max(0.5, H / h);
+  });
+}
+window.addEventListener('load', ajustaFolhas);
+window.addEventListener('beforeprint', ajustaFolhas);
+<\/script>
 </body></html>`;
 }
 function folhaPrevisao(inner, quebra){
