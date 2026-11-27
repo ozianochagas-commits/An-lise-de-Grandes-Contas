@@ -2660,7 +2660,7 @@ function blocoPrevisaoRep(idx){
     const wr = Math.max(0, Math.min(pr, 100)), wp = Math.max(0, Math.min(pp, 100) - wr);
     const dif = proj - v.meta;
     const rot = t => `<div style="font-size:9.5px;color:#BDBDBD;letter-spacing:.6px">${t}</div>`;
-    const caixa = (t, val, cor, extra) => `<div style="flex:1">${rot(t)}<div style="font-size:13px;font-weight:800;color:${cor||'#fff'}">${val}</div>${extra ? `<div style="font-size:9.5px;color:#D0D0D0">${extra}</div>` : ''}</div>`;
+    const caixa = (t, val, cor, extra) => `<div style="flex:1">${rot(t)}<div style="font-size:13px;font-weight:800;color:${cor||'#fff'}">${val}</div>${extra ? `<div style="font-size:11px;font-weight:800;color:#fff;margin-top:2px">${extra}</div>` : ''}</div>`;
     return `<div class="geral" style="display:block;margin-top:8px;padding:9px 12px">
       <div style="font-size:10px;color:#BDBDBD;letter-spacing:1px;margin-bottom:6px">RESULTADO × META — ${mesTexto.toUpperCase()}</div>
       <div style="display:flex;gap:8px;align-items:flex-start">
