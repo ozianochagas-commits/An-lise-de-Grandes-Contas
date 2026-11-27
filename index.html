@@ -2648,6 +2648,26 @@ function blocoPrevisaoRep(idx){
     </div>
   </div>
 
+  ${(()=>{
+    // Resultado do mês até o momento contra a meta (valores que estão na tela, em Editar Dados)
+    let v = null; try{ v = getVals()[idx]; }catch(e){}
+    if(!v || !(v.meta > 0 || v.real > 0)) return '';
+    const atp = v.meta > 0 ? v.real / v.meta * 100 : 0;
+    const falta = v.meta - v.real;
+    const cor = atp >= 100 ? '#5DD879' : '#FE5000';
+    const w = Math.max(0, Math.min(atp, 100));
+    return `<div class="geral" style="display:block;margin-top:8px">
+      <div style="font-size:9px;opacity:.65;letter-spacing:1px;margin-bottom:6px">RESULTADO ATÉ O MOMENTO × META — ${mesTexto.toUpperCase()}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:14px">
+        <div><div style="font-size:9px;opacity:.65;letter-spacing:1px">META</div><div style="font-size:14px;font-weight:900">${R(v.meta)}</div></div>
+        <div><div style="font-size:9px;opacity:.65;letter-spacing:1px">REALIZADO</div><div style="font-size:14px;font-weight:900;color:#FE5000">${R(v.real)}</div></div>
+        <div><div style="font-size:9px;opacity:.65;letter-spacing:1px">${falta > 0 ? 'FALTA P/ META' : 'ACIMA DA META'}</div><div style="font-size:14px;font-weight:900;color:${falta > 0 ? '#FF7B6B' : '#5DD879'}">${R(Math.abs(falta))}</div></div>
+        <div style="text-align:right"><div style="font-size:9px;opacity:.65;letter-spacing:1px">% DA META</div><div style="font-size:20px;font-weight:900;color:${cor}">${atp.toFixed(1).replace('.',',')}%</div></div>
+      </div>
+      <div style="height:6px;background:rgba(255,255,255,.18);border-radius:3px;margin-top:8px;overflow:hidden"><div style="height:6px;width:${w}%;background:${cor}"></div></div>
+    </div>`;
+  })()}
+
   `;
   return { rep, qtd: clients.length, totGeral, passGeral, gapGeral, pct, bodyHtml };
 }
