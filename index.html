@@ -2630,20 +2630,20 @@ function blocoPrevisaoRep(idx){
 
   <div class="geral">
     <div>
-      <div style="font-size:9px;opacity:.65;letter-spacing:1px">CENÁRIO</div>
+      <div style="font-size:10px;color:#BDBDBD;letter-spacing:1px">CENÁRIO</div>
       <div style="font-size:14px;font-weight:900">${R(totGeral)}</div>
     </div>
     <div>
-      <div style="font-size:9px;opacity:.65;letter-spacing:1px">PASSOU</div>
+      <div style="font-size:10px;color:#BDBDBD;letter-spacing:1px">PASSOU</div>
       <div style="font-size:14px;font-weight:900;color:#FE5000">${R(passGeral)}</div>
     </div>
     <div>
-      <div style="font-size:9px;opacity:.65;letter-spacing:1px">GAP</div>
+      <div style="font-size:10px;color:#BDBDBD;letter-spacing:1px">GAP</div>
       <div style="font-size:14px;font-weight:900;color:${gapGeral>=0?'#5DD879':'#FF7B6B'}">
         ${(gapGeral>0?'+':'')+R(gapGeral)}</div>
     </div>
     <div style="text-align:right">
-      <div style="font-size:9px;opacity:.65;letter-spacing:1px">ATINGIDO</div>
+      <div style="font-size:10px;color:#BDBDBD;letter-spacing:1px">ATINGIDO</div>
       <div style="font-size:20px;font-weight:900;color:#FE5000">${pct.toFixed(1).replace('.',',')}%</div>
     </div>
   </div>
@@ -2659,21 +2659,21 @@ function blocoPrevisaoRep(idx){
     const f1 = x => x.toFixed(1).replace('.', ',');
     const wr = Math.max(0, Math.min(pr, 100)), wp = Math.max(0, Math.min(pp, 100) - wr);
     const dif = proj - v.meta;
-    const rot = t => `<div style="font-size:8px;opacity:.65;letter-spacing:.8px">${t}</div>`;
-    const caixa = (t, val, cor, extra) => `<div style="flex:1">${rot(t)}<div style="font-size:12px;font-weight:900;color:${cor||'#fff'}">${val}</div>${extra ? `<div style="font-size:8.5px;opacity:.8">${extra}</div>` : ''}</div>`;
+    const rot = t => `<div style="font-size:9.5px;color:#BDBDBD;letter-spacing:.6px">${t}</div>`;
+    const caixa = (t, val, cor, extra) => `<div style="flex:1">${rot(t)}<div style="font-size:13px;font-weight:800;color:${cor||'#fff'}">${val}</div>${extra ? `<div style="font-size:9.5px;color:#D0D0D0">${extra}</div>` : ''}</div>`;
     return `<div class="geral" style="display:block;margin-top:8px;padding:9px 12px">
-      <div style="font-size:8.5px;opacity:.7;letter-spacing:1px;margin-bottom:6px">RESULTADO × META — ${mesTexto.toUpperCase()}</div>
+      <div style="font-size:10px;color:#BDBDBD;letter-spacing:1px;margin-bottom:6px">RESULTADO × META — ${mesTexto.toUpperCase()}</div>
       <div style="display:flex;gap:8px;align-items:flex-start">
         ${caixa('META', R(v.meta))}
         ${caixa('REALIZADO ATÉ AGORA', R(v.real), '#FE5000', f1(pr) + '% da meta')}
         ${caixa('+ CENÁRIO', R(cen), '#FFB27A', 'ainda previsto')}
         ${caixa('= REALIZADO + CENÁRIO', R(proj), pp >= 100 ? '#5DD879' : '#FFD166', f1(pp) + '% da meta')}
       </div>
-      <div style="position:relative;height:7px;background:rgba(255,255,255,.18);border-radius:4px;margin-top:8px;overflow:hidden">
+      <div style="position:relative;height:7px;background:#4A4A4A;border-radius:4px;margin-top:8px;overflow:hidden">
         <div style="position:absolute;left:0;top:0;height:7px;width:${wr}%;background:#FE5000"></div>
         <div style="position:absolute;left:${wr}%;top:0;height:7px;width:${wp}%;background:#FFB27A"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:8.5px;opacity:.85;margin-top:4px">
+      <div style="display:flex;justify-content:space-between;font-size:9.5px;color:#D0D0D05;margin-top:4px">
         <span>■ <span style="color:#FE5000">Realizado</span> &nbsp; ■ <span style="color:#FFB27A">Cenário</span> &nbsp; (barra cheia = meta)</span>
         <span>${dif >= 0 ? 'Se o cenário passar, ultrapassa a meta em <b style="color:#5DD879">' + R(dif) + '</b>' : 'Mesmo com o cenário, faltam <b style="color:#FF7B6B">' + R(-dif) + '</b> para a meta'}</span>
       </div>
